@@ -587,7 +587,7 @@ async function generatePptx(){
     const fileName=`${safeFile(ds.client)}_MIS_Report.pptx`;
     setProgress(80,`Saving ${ds.client}...`);
     await pptx.writeFile({fileName});
-    }catch(e){showToast('PPT error for '+datasets[i].client+': '+(e.message||String(e)));continue}
+    }catch(e){const em=e&&e.message?e.message:String(e||'unknown');const st=e&&e.stack?e.stack.split('\n').slice(0,2).join(' | ') : '';console.error(e);showToast(datasets[i].client+': '+em+' ('+st+')');continue}
   }
 }
 
