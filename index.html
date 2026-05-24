@@ -6,7 +6,7 @@
 <title>MIS Dashboard — Sonic Business Solutions</title>
 <link rel="icon" type="image/png" href="logo-light.png">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgenjs.bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <style>
@@ -521,123 +521,67 @@ async function generatePptx(){
   const datasets=app.datasets.map(ds=>{const r=buildSummary(ds.records);const a=buildAggregates(ds.records);return{...ds,summary:r,agg:a}});
   if(app.datasets.length>=2){const m=getMergedRecords();datasets.push({source:'merged',client:'All Customers (Consolidated)',records:m,summary:buildSummary(m),agg:buildAggregates(m)})}
 
+  const NAVY='1E3A5F',BLUE='2563EB',WHITE='FFFFFF',DARK='0F172A',GRAY='64748B',LGRAY='94A3B8',BORDER='CBD5E1';
+  const ACCENT=['EBF5FF','D1FAE5','FEF3C7','FEE2E2'];
+
   for(let i=0;i<datasets.length;i++){
     setProgress(20+i*(60/datasets.length),`Generating ${datasets[i].client}...`);
     const ds=datasets[i],s=ds.summary,a=ds.agg;
     const pptx=new PptxGenJS();pptx.layout='LAYOUT_WIDE';
     pptx.author='Sonic Business Solutions';pptx.subject='MIS Dashboard Report';
 
-    // Colors
-    const NAVY='1E3A5F',BLUE='2563EB',WHITE='FFFFFF',DARK='0F172A',GRAY='64748B',LGRAY='94A3B8';
+    const genDate=new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+    const footer=sl=>{sl.addShape(pptx.shapes.LINE,{x:0.5,y:6.82,w:'90%',h:0,line:{color:BORDER,width:0.5}});sl.addText(`Generated ${genDate}`,{x:0.5,y:6.85,w:8,h:0.2,fontSize:7,fontFace:'Arial',color:LGRAY});sl.addText(ds.client,{x:9,y:6.85,w:4,h:0.2,fontSize:7,fontFace:'Arial',color:NAVY,bold:true,align:'right'})};
+    const kpiRow=(sl,kpis,y)=>{
+      kpis.forEach((k,i)=>{const x=0.5+i*3.1;
+        sl.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x,y,w:2.9,h:0.85,fill:{color:ACCENT[i%4]},rectRadius:0.08});
+        sl.addText(k[1],{x:x+0.1,y:y+0.05,w:2.7,h:0.3,fontSize:16,fontFace:'Arial',color:DARK,bold:true});
+        sl.addText(k[0],{x:x+0.1,y:y+0.4,w:2.7,h:0.18,fontSize:7.5,fontFace:'Arial',color:'475569',bold:true});
+        sl.addText(k[2],{x:x+0.1,y:y+0.6,w:2.7,h:0.17,fontSize:7,fontFace:'Arial',color:GRAY})})
+    };
 
     // ── Slide 1: Cover ──
-    let sl=pptx.addSlide();sl.addText('SONIC BUSINESS SOLUTIONS',{x:0,y:0,w:'100%',h:0.5,fontSize:10,fontFace:'Arial',color:WHITE,bold:true,fill:{color:NAVY},align:'center',valign:'middle'});
-    sl.addShape(pptx.shapes.LINE,{x:0.5,y:0.72,w:'90%',h:0,line:{color:BLUE,width:2}});
-    sl.addText('MIS Dashboard',{x:0.5,y:1.1,w:8,h:0.55,fontSize:28,fontFace:'Arial',color:DARK,bold:true});
-    sl.addText(ds.client,{x:0.52,y:1.7,w:7,h:0.35,fontSize:16,fontFace:'Arial',color:NAVY,bold:true});
-    sl.addText(s.period||'Selected Period',{x:0.52,y:2.05,w:7,h:0.25,fontSize:11,fontFace:'Arial',color:GRAY});
-
-    // KPI cards
-    const kpiData=[
-      ['Total Shipments',nf.format(s.shipments),'All consignments'],
-      ['Delivered',`${s.deliveredRate}%`,`${nf.format(s.delivered)} closed`],
-      ['On-Time Rate',`${s.onTimeRate}%`,`${nf.format(s.lateDelivered)} late`],
-      ['Open Delayed',nf.format(s.delayedOpen),`${nf.format(s.open)} open`]
-    ];
-    const kpiColors=['EBF5FF','D1FAE5','FEF3C7','FEE2E2'];
-    kpiData.forEach((k,i)=>{
-      sl.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:0.5+i*3.1,y:2.55,w:2.9,h:0.95,fill:{color:kpiColors[i]},rectRadius:0.1});
-      sl.addText(k[1],{x:0.6+i*3.1,y:2.6,w:2.7,h:0.35,fontSize:18,fontFace:'Arial',color:DARK,bold:true});
-      sl.addText(k[0],{x:0.6+i*3.1,y:2.95,w:2.7,h:0.2,fontSize:7.5,fontFace:'Arial',color:'475569',bold:true});
-      sl.addText(k[2],{x:0.6+i*3.1,y:3.15,w:2.7,h:0.2,fontSize:7,fontFace:'Arial',color:GRAY});
-    });
-
+    let sl=pptx.addSlide();
+    sl.addText('SONIC BUSINESS SOLUTIONS',{x:0,y:0,w:'100%',h:0.45,fontSize:10,fontFace:'Arial',color:WHITE,bold:true,fill:{color:NAVY},align:'center',valign:'middle'});
+    sl.addShape(pptx.shapes.LINE,{x:0.5,y:0.7,w:'90%',h:0,line:{color:BLUE,width:2}});
+    sl.addText('MIS Dashboard',{x:0.5,y:0.95,w:8,h:0.5,fontSize:28,fontFace:'Arial',color:DARK,bold:true});
+    sl.addText(ds.client,{x:0.52,y:1.5,w:7,h:0.3,fontSize:16,fontFace:'Arial',color:NAVY,bold:true});
+    kpiRow(sl,[['Total Shipments',nf.format(s.shipments),'All consignments'],['Delivered',`${s.deliveredRate}%`,`${nf.format(s.delivered)} closed`],['On-Time Rate',`${s.onTimeRate}%`,`${nf.format(s.lateDelivered)} late`],['Open Delayed',nf.format(s.delayedOpen),`${nf.format(s.open)} open`]],2.3);
     // Insights
-    const insights=[
-      `${s.deliveredRate}% closure across ${nf.format(s.shipments)} shipments; ${nf.format(s.open)} remain open.`,
-      `${s.onTimeRate}% on-time delivery; ${nf.format(s.lateDelivered)} late delivered.`,
-      `${nf.format(s.delayedOpen)} open past promise — require ETA updates.`,
-      a.states.length?`${a.states[0].label} is top destination state.`:'',
-      a.lanes.length?`Top lane: ${a.lanes[0].label}.`:''
-    ].filter(Boolean);
-    sl.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:0.5,y:4.0,w:'90%',h:1.5,fill:{color:'F8FAFC'},line:{color:'E2E8F0',width:0.5},rectRadius:0.1});
-    sl.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:0.5,y:4.0,w:0.06,h:1.5,fill:{color:BLUE}});
-    sl.addText('Executive Summary',{x:0.7,y:4.1,w:4,h:0.25,fontSize:9.5,fontFace:'Arial',color:DARK,bold:true});
-    insights.forEach((ins,idx)=>{sl.addText(`• ${ins}`,{x:0.7,y:4.38+idx*0.22,w:11,h:0.22,fontSize:8,fontFace:'Arial',color:'334155'})});
+    const inss=[`${s.deliveredRate}% closure across ${nf.format(s.shipments)} shipments; ${nf.format(s.open)} remain open.`,`${s.onTimeRate}% on-time delivery; ${nf.format(s.lateDelivered)} late delivered.`,`${nf.format(s.delayedOpen)} open past promise — require ETA updates.`,a.states.length?`${a.states[0].label} is top destination state.`:'',a.lanes.length?`Top lane: ${a.lanes[0].label}.`:''].filter(Boolean);
+    sl.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:0.5,y:3.65,w:'90%',h:1.8,fill:{color:'F8FAFC'},line:{color:'E2E8F0',width:0.5},rectRadius:0.1});
+    sl.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:0.5,y:3.65,w:0.05,h:1.8,fill:{color:BLUE}});
+    sl.addText('Executive Summary',{x:0.75,y:3.75,w:4,h:0.22,fontSize:9.5,fontFace:'Arial',color:DARK,bold:true});
+    inss.forEach((ins,j)=>{sl.addText(`• ${ins}`,{x:0.75,y:4.05+j*0.22,w:11,h:0.22,fontSize:8,fontFace:'Arial',color:'334155'})});
+    // Status table on cover
+    const sr=[['Status','Count','Share']];
+    a.status.forEach(e=>sr.push([e.label,nf.format(e.value),`${Math.round(e.value/s.shipments*100)}%`]));
+    const stTbl=[{rows:sr,options:{x:0.55,y:5.6,w:5.5,fontSize:7,fontFace:'Arial',border:{color:BORDER,pt:0.5},colW:[2,1.2,1.5],rowH:0.28}}];
+    stTbl.forEach(t=>{const tbl=pptx.addTable(t.rows,t.options);tbl.rows[0].fill={color:NAVY};tbl.rows[0].color=WHITE;tbl.rows[0].bold=true;sl.addTable(tbl)});
+    footer(sl);
 
-    // Footer
-    sl.addShape(pptx.shapes.LINE,{x:0.5,y:6.82,w:'90%',h:0,line:{color:'CBD5E1',width:0.5}});
-    sl.addText(`Generated ${new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}`,{x:0.5,y:6.85,w:8,h:0.2,fontSize:7,fontFace:'Arial',color:LGRAY});
-    sl.addText(ds.client,{x:9,y:6.85,w:4,h:0.2,fontSize:7,fontFace:'Arial',color:NAVY,bold:true,align:'right'});
-
-    // ── Slide 2: Charts ──
+    // ── Slide 2: Performance ──
     sl=pptx.addSlide();
     sl.addText('Performance Overview',{x:0.5,y:0.15,w:8,h:0.35,fontSize:20,fontFace:'Arial',color:DARK,bold:true});
-    sl.addText(s.period||'Selected Period',{x:0.5,y:0.48,w:8,h:0.2,fontSize:9,fontFace:'Arial',color:GRAY});
-    sl.addShape(pptx.shapes.LINE,{x:0.5,y:0.72,w:'90%',h:0,line:{color:'E2E8F0',width:0.5}});
-
-    // Status Chart
-    const sc=a.status.filter(e=>e.value>0);
-    if(sc.length>=2){
-      sl.addChart(pptx.charts.DOUGHNUT,{
-        labels:sc.map(e=>e.label),
-        datasets:[{data:sc.map(e=>e.value)}]
-      },{x:0.3,y:0.85,w:5.5,h:3.2,showLegend:true,legendPos:'b',legendFontSize:8,showTitle:true,title:'Shipment Status',titleFontSize:11,titleColor:DARK,chartColors:['2563EB','059669','D97706','DC2626','7C3AED','64748B','0F766E','EAB308']});
-    }
-
-    // Trend Chart
-    const td=a.trend.slice(-14);
-    if(td.length){
-      sl.addChart(pptx.charts.LINE,{
-        labels:td.map(t=>t.label),
-        datasets:[{name:'Shipments',data:td.map(t=>t.value)}]
-      },{x:6.2,y:0.85,w:6.5,h:2.8,showLegend:false,showTitle:true,title:'Manifest Trend',titleFontSize:11,titleColor:DARK,lineDataSymbol:'circle',lineDataSymbolSize:6,lineSize:2,chartColors:['2563EB'],valAxisMinVal:0});
-    }
-
-    // KPIs Row
-    const kpis2=[['Package Value',s.valueLabel,'Declared value'],['Total Boxes',nf.format(s.boxes),s.weightLabel],['Avg TAT',s.avgTatLabel,'Pickup to delivery'],['Attempted',nf.format(s.attempted),'With attempts']];
-    kpis2.forEach((k,i)=>{
-      sl.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:0.5+i*3.1,y:4.3,w:2.9,h:0.85,fill:{color:'FFFFFF'},line:{color:'E2E8F0',width:0.5},rectRadius:0.08});
-      sl.addText(k[1],{x:0.6+i*3.1,y:4.35,w:2.7,h:0.3,fontSize:16,fontFace:'Arial',color:DARK,bold:true});
-      sl.addText(k[0],{x:0.6+i*3.1,y:4.65,w:2.7,h:0.18,fontSize:7.5,fontFace:'Arial',color:'475569',bold:true});
-      sl.addText(k[2],{x:0.6+i*3.1,y:4.85,w:2.7,h:0.17,fontSize:7,fontFace:'Arial',color:GRAY});
-    });
-
+    sl.addShape(pptx.shapes.LINE,{x:0.5,y:0.55,w:'90%',h:0,line:{color:'E2E8F0',width:0.5}});
+    kpiRow(sl,[['Package Value',s.valueLabel,'Declared value'],['Total Boxes',nf.format(s.boxes),s.weightLabel],['Avg TAT',s.avgTatLabel,'Pickup to delivery'],['Attempted',nf.format(s.attempted),'Total attempts']],0.75);
     // Aging table
-    const agingRows=a.aging.map(e=>[e.label,nf.format(e.value),e.label.includes('9')?'Escalate':'Follow-up']);
-    const agingTable=pptx.addTable([['Aging','Count','Action'],...agingRows.map(r=>r.map(String))],{x:0.5,y:5.35,w:6,h:1.3,fontSize:8,fontFace:'Arial',border:{color:'CBD5E1',pt:0.5},colW:[1.8,1,2.5]});
-    agingTable.rows[0].fill={color:NAVY};agingTable.rows[0].color=WHITE;agingTable.rows[0].Bold=true;
-    sl.addTable(agingTable);
-
-    // Footer
-    sl.addShape(pptx.shapes.LINE,{x:0.5,y:6.82,w:'90%',h:0,line:{color:'CBD5E1',width:0.5}});
-    sl.addText(`Generated ${new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}`,{x:0.5,y:6.85,w:8,h:0.2,fontSize:7,fontFace:'Arial',color:LGRAY});
-    sl.addText(ds.client,{x:9,y:6.85,w:4,h:0.2,fontSize:7,fontFace:'Arial',color:NAVY,bold:true,align:'right'});
-
-    // ── Slide 3: States & Lanes ──
-    sl=pptx.addSlide();
-    sl.addText('Network & Movement',{x:0.5,y:0.15,w:8,h:0.35,fontSize:20,fontFace:'Arial',color:DARK,bold:true});
-    sl.addText('Geographic distribution and top lanes',{x:0.5,y:0.48,w:8,h:0.2,fontSize:9,fontFace:'Arial',color:GRAY});
-    sl.addShape(pptx.shapes.LINE,{x:0.5,y:0.72,w:'90%',h:0,line:{color:'E2E8F0',width:0.5}});
-
-    // State chart
-    if(a.states.length){
-      sl.addChart(pptx.charts.BAR,{
-        labels:a.states.map(e=>e.label),
-        datasets:[{name:'Shipments',data:a.states.map(e=>e.value)}]
-      },{x:0.3,y:0.85,w:5.8,h:3.2,showLegend:false,showTitle:true,title:'Top Destination States',titleFontSize:11,titleColor:DARK,chartColors:['0F766E'],barDir:'bar',barGapWidthPct:50,catAxisLabelFontSize:9,valAxisLabelFontSize:8});
-    }
-
-    // Lanes table
-    const laneRows=a.lanes.slice(0,8).map(l=>[l.label.length>35?l.label.slice(0,35)+'...':l.label,nf.format(l.value)]);
-    const laneTable=pptx.addTable([['Lane','Shipments'],...laneRows.map(r=>r.map(String))],{x:6.5,y:0.85,w:6.2,h:3.2,fontSize:8,fontFace:'Arial',border:{color:'CBD5E1',pt:0.5},colW:[4.5,1.7]});
-    laneTable.rows[0].fill={color:NAVY};laneTable.rows[0].color=WHITE;laneTable.rows[0].Bold=true;
-    sl.addTable(laneTable);
-
-    // Footer
-    sl.addShape(pptx.shapes.LINE,{x:0.5,y:6.82,w:'90%',h:0,line:{color:'CBD5E1',width:0.5}});
-    sl.addText(`Generated ${new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}`,{x:0.5,y:6.85,w:8,h:0.2,fontSize:7,fontFace:'Arial',color:LGRAY});
-    sl.addText(ds.client,{x:9,y:6.85,w:4,h:0.2,fontSize:7,fontFace:'Arial',color:NAVY,bold:true,align:'right'});
+    sl.addText('Open Shipment Aging',{x:0.5,y:1.9,w:5,h:0.25,fontSize:11,fontFace:'Arial',color:NAVY,bold:true});
+    const ar=[['Aging','Count','Action']];
+    a.aging.forEach(e=>ar.push([e.label,nf.format(e.value),e.label.includes('9')?'Escalate':'Follow-up']));
+    let _t=pptx.addTable(ar,{x:0.5,y:2.15,w:6,fontSize:8,fontFace:'Arial',border:{color:BORDER,pt:0.5},colW:[1.8,1.2,2],rowH:0.32});_t.rows[0].fill={color:NAVY};_t.rows[0].color=WHITE;_t.rows[0].bold=true;sl.addTable(_t);
+    // Top lanes table
+    sl.addText('Top Lanes',{x:7,y:1.9,w:5,h:0.25,fontSize:11,fontFace:'Arial',color:NAVY,bold:true});
+    const lr=[['Lane','Shipments']];
+    a.lanes.slice(0,8).forEach(l=>lr.push([l.label.length>35?l.label.slice(0,35)+'...':l.label,nf.format(l.value)]));
+    _t=pptx.addTable(lr,{x:7,y:2.15,w:6,fontSize:8,fontFace:'Arial',border:{color:BORDER,pt:0.5},colW:[3.5,1.2],rowH:0.32});_t.rows[0].fill={color:NAVY};_t.rows[0].color=WHITE;_t.rows[0].bold=true;sl.addTable(_t);
+    // Priority exceptions
+    sl.addText('Priority Exceptions',{x:0.5,y:4.9,w:5,h:0.25,fontSize:11,fontFace:'Arial',color:'991B1B',bold:true});
+    const now=new Date();
+    const er=[['Order','Destination','Status','Promise','Amount']];
+    priorityRecords(ds.records).slice(0,6).forEach(r=>{const d=!r.isDelivered&&r.promiseDate&&r.promiseDate<now;er.push([r.id.slice(0,22),`${r.destination}, ${r.state}`.slice(0,26),d?'Delayed':(r.isDelivered?'Delivered':'Open'),formatDate(r.promiseDate),fmtMoney(r.amount)])});
+    _t=pptx.addTable(er,{x:0.5,y:5.2,w:'90%',fontSize:7,fontFace:'Arial',border:{color:BORDER,pt:0.5},colW:[2.2,2.5,1.3,1.5,2],rowH:0.28});_t.rows[0].fill={color:'991B1B'};_t.rows[0].color=WHITE;_t.rows[0].bold=true;sl.addTable(_t);
+    footer(sl);
 
     const fileName=`${safeFile(ds.client)}_MIS_Report.pptx`;
     setProgress(80,`Saving ${ds.client}...`);
