@@ -16,7 +16,33 @@ import streamlit as st
 
 HERE = Path(__file__).parent
 
-st.set_page_config(page_title="Logistics Dashboard", page_icon="📦", layout="wide")
+st.set_page_config(page_title="Logistics Dashboard", page_icon="📊", layout="wide")
+
+# ── Custom CSS for professional look ─────────────────────────────────
+st.markdown("""
+<style>
+    .block-container { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+    .stApp { background: #f4f7fb; }
+    .main-title { color: #0F172A; font-size: 28px; font-weight: 700; margin-bottom: 2px; letter-spacing: -0.3px; }
+    .sub-title { color: #64748B; font-size: 14px; margin-bottom: 20px; }
+    .metric-card { background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+    .metric-card .label { color: #64748B; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+    .metric-card .value { color: #0F172A; font-size: 26px; font-weight: 800; line-height: 1.2; }
+    .metric-card .delta { color: #94A3B8; font-size: 12px; margin-top: 4px; }
+    .divider { border: none; height: 1px; background: #E2E8F0; margin: 20px 0; }
+    h2 { color: #1E3A5F; font-size: 18px; font-weight: 700; margin-bottom: 12px; }
+    h3 { color: #1E3A5F; font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+    .st-emotion-cache-1aeihzq { gap: 0.5rem; }
+    .stButton button { font-weight: 600; border-radius: 8px; }
+    .footer { color: #94A3B8; font-size: 11px; text-align: center; margin-top: 30px; padding-top: 16px; border-top: 1px solid #E2E8F0; }
+    .success-msg { background: #D1FAE5; border: 1px solid #6EE7B7; border-radius: 8px; padding: 12px 16px; color: #047857; font-weight: 600; font-size: 14px; }
+    .stAlert { border-radius: 8px; }
+    div[data-testid="stMetric"] { background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+    div[data-testid="stMetric"] > div:first-child { color: #64748B; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    div[data-testid="stMetric"] > div:nth-child(2) { color: #0F172A; font-size: 26px; font-weight: 800; }
+    div[data-testid="stMetric"] > div:nth-child(3) { color: #94A3B8; font-size: 12px; }
+</style>
+""", unsafe_allow_html=True)
 
 # ── Auth ──────────────────────────────────────────────────────────────
 if "auth_ok" not in st.session_state:
@@ -25,9 +51,11 @@ if "auth_ok" not in st.session_state:
 def login():
     st.markdown("""
     <style>
-    .login-wrap{max-width:380px;margin:100px auto;padding:40px 32px;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.08);background:#fff;text-align:center}
-    .login-wrap h1{font-size:22px;color:#1E3A5F;margin-bottom:4px}
-    .login-wrap p{font-size:13px;color:#64748B;margin-bottom:28px}
+    .login-wrap{max-width:400px;margin:120px auto;padding:48px 36px;border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,.06);background:#fff;text-align:center}
+    .login-wrap h1{font-size:26px;color:#1E3A5F;font-weight:700;margin:0 0 4px 0;letter-spacing:-0.3px}
+    .login-wrap p{font-size:14px;color:#64748B;margin:0 0 32px 0}
+    .login-wrap .stTextInput input{min-height:48px;border-radius:10px;border:1px solid #E2E8F0}
+    .login-wrap .stButton button{height:48px;border-radius:10px;font-weight:600;font-size:15px}
     </style>
     <div class="login-wrap">
     <h1>Logistics Dashboard</h1>
@@ -56,10 +84,8 @@ sys.path.insert(0, str(HERE))
 from app import parse_csv, build_report, generate_ppt, generate_docx, generate_pdf, fmt_num, fmt_money
 
 # ── App ───────────────────────────────────────────────────────────────
-st.markdown("<h1 style='color:#1E3A5F;font-size:26px;margin-bottom:4px'>Logistics Dashboard</h1>",
-            unsafe_allow_html=True)
-st.markdown("<p style='color:#64748B;font-size:13px;margin-bottom:16px'>"
-            "Upload your customer CSV files below.</p>", unsafe_allow_html=True)
+st.markdown('<div class="main-title">Logistics Dashboard</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-title">Multi-customer logistics reporting — upload CSV files below.</div>', unsafe_allow_html=True)
 
 uploaded = st.file_uploader("Choose CSV files", type=["csv"], accept_multiple_files=True,
                             label_visibility="collapsed")
@@ -85,7 +111,7 @@ if uploaded:
             records_by_dataset[f.name] = records
 
     if datasets:
-        st.success(f"✅ {len(datasets)} dataset(s) loaded: {', '.join(d['name'] for d in datasets)}")
+        st.markdown(f'<div class="success-msg">✅ {len(datasets)} dataset(s) loaded: {", ".join(d["name"] for d in datasets)}</div>', unsafe_allow_html=True)
 
         # ── Dataset selector ──────────────────────────────────────────
         names = [d["name"] for d in datasets]
@@ -184,8 +210,9 @@ if uploaded:
                 st.success("No exceptions to show")
 
         # ── Report generation ─────────────────────────────────────────
-        st.markdown("---")
-        st.subheader("📊 Generate Reports")
+        st.markdown('<hr class="divider">', unsafe_allow_html=True)
+        st.markdown("<h2>📊 Generate Reports</h2>", unsafe_allow_html=True)
+        st.markdown("<p style='color:#64748B;font-size:13px;margin-bottom:16px'>Generate PPT, Word, and PDF reports for each customer. Multiple files are bundled into a ZIP.</p>", unsafe_allow_html=True)
 
         # Build per-dataset reports (or merged)
         all_report_data = []
@@ -234,4 +261,4 @@ if uploaded:
 else:
     st.info("👆 Upload one or more CSV files to get started. Supports **sonic_b2b** and **Customer MIS** formats.")
 
-st.caption("🔒 Private — authenticated users only. Data processed in memory, not stored.")
+st.markdown('<div class="footer">🔒 Private — authenticated users only. Data processed in memory, not stored.</div>', unsafe_allow_html=True)

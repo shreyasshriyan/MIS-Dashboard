@@ -20,6 +20,8 @@ from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
 from pptx.enum.shapes import MSO_SHAPE
+from pptx.chart.data import CategoryChartData
+from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION, XL_LABEL_POSITION
 from docx import Document
 from docx.shared import Inches as DocInches, Pt as DocPt, RGBColor as DocRGB
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -371,10 +373,56 @@ def generate_ppt(report):
                 cx += cw_i
 
     def chart_ph(sl, x, y, w, h, label):
-        rect(sl, x-Inches(0.02), y-Inches(0.3), w+Inches(0.04), h+Inches(0.38), WHITE, RGBColor(0xDD,0xE7,0xF0))
-        txt(sl, x+Inches(0.06), y-Inches(0.26), w-Inches(0.12), Inches(0.2), label, 9, True, NAVY)
-        rect(sl, x, y, w, h, RGBColor(0xF8,0xFA,0xFC), RGBColor(0xDD,0xE7,0xF0))
-        txt(sl, x, y+h//2-Inches(0.2), w, Inches(0.4), 'Chart data', 10, False, GRAY, PP_ALIGN.CENTER)
+        pass
+
+    def add_chart(sl, chart_type, categories, values, x, y, w, h, title, has_legend=True):
+        from pptx.chart.data import CategoryChartData
+        from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION
+        chart_data = CategoryChartData()
+        chart_data.categories = [str(c) for c in categories]
+        chart_data.add_series('', [int(v) for v in values])
+        chart_frame = sl.shapes.add_chart(chart_type, x, y, w, h, chart_data)
+        chart = chart_frame.chart
+        chart.has_legend = has_legend
+        if has_legend:
+            chart.legend.position = XL_LEGEND_POSITION.BOTTOM
+            chart.legend.include_in_layout = False
+        chart.font.size = Pt(8)
+        return chart
+
+    def add_pie_chart(sl, cats, vals, x, y, w, h, title):
+        if not cats or len(cats) < 1: return
+        c = add_chart(sl, XL_CHART_TYPE.PIE, cats, vals, x, y, w, h, title, True)
+        plot = c.plots[0]
+        plot.has_data_labels = True
+        plot.data_labels.font.size = Pt(8)
+        plot.data_labels.show_category_name = True
+        plot.data_labels.show_percentage = True
+        plot.data_labels.show_value = False
+
+    def add_bar_chart(sl, cats, vals, x, y, w, h, title):
+        if not cats: return
+        c = add_chart(sl, XL_CHART_TYPE.BAR_CLUSTERED, cats, vals, x, y, w, h, title, False)
+        plot = c.plots[0]
+        plot.has_data_labels = True
+        plot.data_labels.font.size = Pt(8)
+        plot.data_labels.show_value = True
+
+    def add_col_chart(sl, cats, vals, x, y, w, h, title):
+        if not cats: return
+        c = add_chart(sl, XL_CHART_TYPE.COLUMN_CLUSTERED, cats, vals, x, y, w, h, title, False)
+        plot = c.plots[0]
+        plot.has_data_labels = True
+        plot.data_labels.font.size = Pt(8)
+        plot.data_labels.show_value = True
+
+    def add_line_chart(sl, cats, vals, x, y, w, h, title):
+        if not cats: return
+        c = add_chart(sl, XL_CHART_TYPE.LINE, cats, vals, x, y, w, h, title, False)
+        plot = c.plots[0]
+        plot.has_data_labels = True
+        plot.data_labels.font.size = Pt(8)
+        plot.data_labels.show_value = True
 
     def header(sl, title, sub='', desc=''):
         rect(sl, 0, 0, sw, Inches(0.08), NAVY)
@@ -426,7 +474,19 @@ def generate_ppt(report):
         sh = round(c / ts * 100); cm = 'Closed' if s.lower() == 'delivered' else ('Moving' if 'transit' in s.lower() else 'Monitor')
         sr.append([s, fmt_num(c), f'{sh}%', cm])
     tbl(sl, sr, rx, Inches(2.22), tw, Inches(2.15), [2.4, 1.05, 1.05, 1.25])
-    chart_ph(sl, lx, Inches(4.82), tw, Inches(1.75), 'Daily Manifest Trend')
+    # Real trend chart
+    trend_data = {}
+    for r in report['records']:
+        d = r['manifest'] or r['pickup']
+        if d:
+            k = d.strftime('%d %b')
+            trend_data[k] = trend_data.get(k, 0) + 1
+    if trend_data:
+        sd = sorted(trend_data.keys())
+        add_line_chart(sl, sd[-10:], [trend_data[k] for k in sd[-10:]],
+                       lx, Inches(4.7), tw, Inches(1.9), 'Daily Manifest Trend')
+    else:
+        add_col_chart(sl, ['No data'], [0], lx, Inches(4.7), tw, Inches(1.9), 'Daily Trend')
     ar = [['Open Aging', 'Count', 'Interpretation']]
     for lb, vl in sorted(report['aging'].items()):
         ar.append([lb, fmt_num(vl), 'Escalate' if lb == '9d+' else ('Watchlist' if lb == '6-8d' else 'Follow-up')])
@@ -436,8 +496,27 @@ def generate_ppt(report):
     # ── Slide 3: Performance ──
     sl = prs.slides.add_slide(prs.slide_layouts[6])
     header(sl, 'Service Performance', 'Delivery closure, promise adherence', 'Operational metrics')
-    chart_ph(sl, Inches(0.5), Inches(1.02), Inches(5.95), Inches(4.35), 'Shipment Status Distribution')
-    chart_ph(sl, Inches(6.8), Inches(1.02), Inches(5.95), Inches(2.35), 'Daily Manifest Volume')
+    status_cats = [s for s, c in report['status_entries']]
+    status_vals = [c for s, c in report['status_entries']]
+    if len(status_cats) >= 2:
+        add_pie_chart(sl, status_cats, status_vals, Inches(0.5), Inches(1.02),
+                      Inches(5.95), Inches(4.35), 'Shipment Status Distribution')
+    else:
+        add_col_chart(sl, status_cats or ['No Data'], status_vals or [0],
+                      Inches(0.5), Inches(1.02), Inches(5.95), Inches(4.35), 'Shipment Status')
+    trend_data = {}
+    for r in report['records']:
+        d = r['manifest'] or r['pickup']
+        if d:
+            k = d.strftime('%d %b')
+            trend_data[k] = trend_data.get(k, 0) + 1
+    if trend_data:
+        sd = sorted(trend_data.keys())
+        add_line_chart(sl, sd[-10:], [trend_data[k] for k in sd[-10:]],
+                       Inches(6.8), Inches(1.02), Inches(5.95), Inches(2.35), 'Daily Manifest Volume')
+    else:
+        add_bar_chart(sl, ['No data'], [0], Inches(6.8), Inches(1.02),
+                      Inches(5.95), Inches(2.35), 'Daily Volume')
     callout(sl, Inches(6.8), Inches(3.78), Inches(5.95), Inches(1.6), 'Performance Notes', [
         f"{report['delivered_rate']}% closed delivered.", f"{report['on_time_rate']}% met promise.",
         f"{fmt_num(report['open_delayed'])} past promise."], RGBColor(0xD9,0x77,0x06))
@@ -446,8 +525,15 @@ def generate_ppt(report):
     # ── Slide 4: Network ──
     sl = prs.slides.add_slide(prs.slide_layouts[6])
     header(sl, 'Network & Movement', 'Geographic distribution, aging, top lanes', 'States, aging, and lanes')
-    chart_ph(sl, Inches(0.5), Inches(1.02), Inches(5.95), Inches(3.25), 'Top Destination States')
-    chart_ph(sl, Inches(6.8), Inches(1.02), Inches(5.95), Inches(3.25), 'Open Shipment Aging')
+    state_cats = [s for s, c in report['state_entries'][:8]]
+    state_vals = [c for s, c in report['state_entries'][:8]]
+    if state_cats:
+        add_bar_chart(sl, state_cats, state_vals, Inches(0.5), Inches(1.02),
+                      Inches(5.95), Inches(3.25), 'Top Destination States')
+    aging_cats = sorted(report['aging'].keys())
+    aging_vals = [report['aging'][k] for k in aging_cats]
+    add_col_chart(sl, aging_cats, aging_vals, Inches(6.8), Inches(1.02),
+                  Inches(5.95), Inches(3.25), 'Open Shipment Aging')
     lr = [['Lane', 'Shipments', 'Delivered', 'Open', 'Rate']]
     for lane, count in report['lane_entries'][:6]:
         lr_recs = [r for r in report['records'] if f"{r['origin']} -> {r['dest']}" == lane]
