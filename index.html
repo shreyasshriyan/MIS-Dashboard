@@ -3,134 +3,278 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Logistics Dashboard</title>
-<script src="vendor/lucide.min.js"></script>
+<title>MIS Dashboard — Sonic Business Solutions</title>
+<link rel="icon" type="image/png" href="logo-light.png">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgenjs.bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#f4f7fb;color:#111827;font-family:Inter,ui-sans-serif,system-ui,sans-serif}
-button,select,input{font:inherit}button{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 14px;border:1px solid #dbe5ef;border-radius:8px;background:#fff;color:#0f172a;cursor:pointer}
-button:hover{border-color:#aebfd1}button:disabled{opacity:.55;cursor:not-allowed}.primary{background:#1e3a5f;border-color:#1e3a5f;color:#fff}
-.download-link{display:inline-flex;align-items:center;min-height:40px;padding:0 14px;border:1px solid #a7f3d0;border-radius:8px;background:#d1fae5;color:#047857;font-size:13px;font-weight:800;text-decoration:none}
+:root {
+  --navy: #1E3A5F; --blue: #2563EB; --blue-light: #EBF5FF; --blue-border: #93C5FD;
+  --ink: #0F172A; --dark: #1F2937; --slate: #475569; --gray: #64748B; --muted: #94A3B8;
+  --border: #E2E8F0; --border-dark: #CBD5E1; --bg: #F8FAFC; --card: #FFFFFF;
+  --green: #059669; --green-bg: #D1FAE5; --green-border: #6EE7B7;
+  --amber: #D97706; --amber-bg: #FEF3C7; --amber-border: #FCD34D;
+  --red: #DC2626; --red-bg: #FEE2E2; --red-border: #FCA5A5;
+  --purple: #7C3AED; --teal: #0F766E;
+  --radius: 12px; --radius-sm: 8px; --shadow: 0 1px 3px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04);
+  --shadow-lg: 0 4px 12px rgba(15,23,42,0.08), 0 2px 4px rgba(15,23,42,0.04);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased}
+button,select,input{font:inherit}
+button{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 18px;border:1px solid var(--border-dark);border-radius:var(--radius-sm);background:var(--card);color:var(--ink);cursor:pointer;font-weight:600;font-size:13px;transition:all .15s}
+button:hover{border-color:var(--blue);color:var(--blue);box-shadow:var(--shadow)}
+button:disabled{opacity:.45;cursor:not-allowed;box-shadow:none;border-color:var(--border-dark);color:var(--muted)}
+.btn-primary{background:var(--navy);border-color:var(--navy);color:#fff}
+.btn-primary:hover{background:#2D4F7A;border-color:#2D4F7A;color:#fff}
+.btn-blue{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn-blue:hover{background:#1D4ED8;border-color:#1D4ED8;color:#fff}
+.btn-amber{background:var(--amber);border-color:var(--amber);color:#fff}
+.btn-amber:hover{background:#B45309;border-color:#B45309;color:#fff}
+.btn-red{background:var(--red);border-color:var(--red);color:#fff}
+.btn-red:hover{background:#B91C1C;border-color:#B91C1C;color:#fff}
 .hidden{display:none!important}
-.file-input-hidden{position:fixed;left:-9999px;opacity:0;width:1px;height:1px;z-index:-1}.shell{width:min(1460px,calc(100% - 32px));margin:0 auto;padding:22px 0 34px}
-.topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px}
-.eyebrow{margin:0 0 4px;color:#2563eb;font-size:12px;font-weight:850;text-transform:uppercase}
-h1{font-size:28px;margin:0}.meta{display:flex;gap:8px;margin-top:8px;color:#64748b;font-size:13px;flex-wrap:wrap}
-.pill{display:inline-flex;align-items:center;min-height:24px;border:1px solid #dbe5ef;border-radius:999px;background:#fff;padding:0 10px;color:#64748b;font-size:12px;font-weight:750}
-.actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.drop-zone{display:flex;align-items:center;gap:13px;min-height:88px;padding:16px;border:1px dashed #9fb4ca;border-radius:8px;background:#fff;box-shadow:0 14px 32px rgba(15,23,42,.08);cursor:pointer}
-.drop-zone.dragging{border-color:#2563eb;background:#eff6ff}.drop-icon{display:grid;place-items:center;width:44px;height:44px;border-radius:8px;background:#dbeafe;color:#2563eb}
-.drop-zone strong{display:block;font-size:15px}.drop-zone span span{display:block;margin-top:4px;color:#64748b;font-size:12px}
-.upload-row{display:grid;grid-template-columns:minmax(260px,.8fr) minmax(560px,1.8fr);gap:14px;margin-bottom:14px}
-.datasets-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;padding:10px 14px;border:1px solid #dbe5ef;border-radius:8px;background:#fff;box-shadow:0 14px 32px rgba(15,23,42,.08)}
-.datasets-bar .label{color:#64748b;font-size:11px;font-weight:850;text-transform:uppercase;margin-right:4px}
-.dataset-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border:1px solid #dbe5ef;border-radius:999px;background:#fff;font-size:12px;font-weight:700;cursor:pointer}
-.dataset-chip:hover{border-color:#2563eb}.dataset-chip.active{background:#2563eb;border-color:#2563eb;color:#fff}
-.dataset-chip .remove{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;font-size:11px;cursor:pointer;opacity:.5}
-.filters{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:14px;border:1px solid #dbe5ef;border-radius:8px;background:#fff;box-shadow:0 14px 32px rgba(15,23,42,.08)}
-.filter-label{display:block;margin-bottom:6px;color:#64748b;font-size:11px;font-weight:850;text-transform:uppercase}
-select{width:100%;min-height:40px;border:1px solid #dbe5ef;border-radius:8px;background:#fff;padding:0 10px}
-.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:14px}
-.card{border:1px solid #dbe5ef;border-radius:8px;background:#fff;box-shadow:0 14px 32px rgba(15,23,42,.08)}
-.kpi{min-height:112px;padding:14px}.kpi.blue{border-top:3px solid #2563eb}.kpi.green{border-top:3px solid #059669}
-.kpi.amber{border-top:3px solid #d97706}.kpi.red{border-top:3px solid #dc2626}
-.kpi-label{color:#64748b;font-size:12px;font-weight:850;text-transform:uppercase}
-.kpi-value{margin-top:10px;font-size:27px;font-weight:900;overflow-wrap:anywhere}
-.kpi-sub{margin-top:10px;color:#64748b;font-size:12px}
-.main-grid{display:grid;grid-template-columns:1.18fr .82fr;gap:14px}.charts{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.panel{padding:14px}.panel-head{display:flex;justify-content:space-between;margin-bottom:10px}
-.panel h2{font-size:15px}.note{color:#64748b;font-size:12px}
-canvas{width:100%;height:270px;display:block}#statusCanvas{height:340px}
-.side{display:grid;gap:14px}.table-wrap{overflow:auto;max-height:430px;border:1px solid #dbe5ef;border-radius:8px}
-table{width:100%;min-width:650px;border-collapse:collapse;background:#fff}
-th,td{padding:10px 11px;border-bottom:1px solid #e8eef5;text-align:left;font-size:12px;white-space:nowrap}
-th{position:sticky;top:0;background:#eef5fb;color:#334155;font-size:11px;text-transform:uppercase;z-index:1}
-.badge{display:inline-flex;align-items:center;min-height:22px;border-radius:999px;padding:0 9px;font-size:11px;font-weight:850}
-.badge.delivered{background:#d1fae5;color:#047857}.badge.transit{background:#dbeafe;color:#1d4ed8}
-.badge.pending{background:#fef3c7;color:#92400e}.badge.delayed{background:#fee2e2;color:#991b1b}
-.empty{display:grid;place-items:center;min-height:260px;border:1px dashed #a8bbce;border-radius:8px;background:#fff;color:#64748b;text-align:center;padding:26px;margin-top:14px}
-.toast{position:fixed;right:18px;bottom:18px;max-width:min(440px,calc(100vw - 36px));padding:12px 14px;border-radius:8px;background:#0f172a;color:#fff;font-size:13px;opacity:0;pointer-events:none;transform:translateY(8px);transition:.15s;z-index:10}
+.shell{max-width:1400px;margin:0 auto;padding:20px 24px 40px}
+
+/* ── Brand Header ── */
+.brand-bar{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:20px}
+.brand-left{display:flex;align-items:center;gap:14px}
+.brand-logo{height:42px;width:auto;border-radius:4px}
+.brand-title{font-size:22px;font-weight:800;color:var(--ink);letter-spacing:-0.3px}
+.brand-sub{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:1px}
+.brand-right{display:flex;align-items:center;gap:10px}
+
+/* ── Upload Zone ── */
+.upload-row{display:grid;grid-template-columns:minmax(280px,.8fr) minmax(500px,1.5fr);gap:16px;margin-bottom:16px}
+.drop-zone{display:flex;align-items:center;gap:16px;min-height:88px;padding:20px 24px;border:2px dashed var(--blue-border);border-radius:var(--radius);background:var(--blue-light);cursor:pointer;transition:all .15s}
+.drop-zone:hover,.drop-zone.dragging{border-color:var(--blue);background:#DBEAFE}
+.drop-icon{display:grid;place-items:center;width:48px;height:48px;border-radius:var(--radius-sm);background:var(--blue);color:#fff;flex-shrink:0}
+.drop-zone strong{display:block;font-size:15px;color:var(--ink)}
+.drop-zone .sub{display:block;margin-top:3px;color:var(--slate);font-size:12px;font-weight:400}
+.file-input-hidden{position:fixed;left:-9999px;opacity:0;width:1px;height:1px;z-index:-1}
+
+/* ── Filters ── */
+.filters{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:16px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+.filter-label{display:block;margin-bottom:5px;color:var(--slate);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+select{width:100%;min-height:40px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--card);padding:0 10px;font-size:13px;color:var(--ink)}
+
+/* ── Datasets Bar ── */
+.datasets-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;padding:12px 16px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+.datasets-bar .label{color:var(--muted);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px}
+.dataset-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border:1px solid var(--border);border-radius:999px;background:var(--card);font-size:12px;font-weight:700;cursor:pointer;transition:all .15s}
+.dataset-chip:hover{border-color:var(--blue);color:var(--blue)}
+.dataset-chip.active{background:var(--blue);border-color:var(--blue);color:#fff}
+.dataset-chip .remove{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;font-size:13px;cursor:pointer;opacity:.5;transition:opacity .1s}
+.dataset-chip .remove:hover{opacity:1}
+
+/* ── Meta ── */
+.meta-row{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;min-height:24px;border:1px solid var(--border);border-radius:999px;background:var(--card);padding:0 12px;color:var(--slate);font-size:12px;font-weight:700}
+
+/* ── KPIs ── */
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:18px}
+.kpi-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px 16px 14px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.kpi-card.blue::before{background:var(--blue)}
+.kpi-card.green::before{background:var(--green)}
+.kpi-card.amber::before{background:var(--amber)}
+.kpi-card.red::before{background:var(--red)}
+.kpi-label{color:var(--slate);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.kpi-value{font-size:28px;font-weight:900;color:var(--ink);line-height:1.1}
+.kpi-sub{margin-top:6px;color:var(--gray);font-size:12px;font-weight:500}
+
+/* ── Charts ── */
+.main-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.card-body{padding:16px 20px}
+.card-head{padding:16px 20px 0;display:flex;justify-content:space-between;align-items:flex-start}
+.card-title{font-size:15px;font-weight:700;color:var(--ink)}
+.card-note{font-size:12px;color:var(--gray);margin-top:2px}
+.chart-wrap{padding:8px 16px 16px;position:relative;height:260px}
+.chart-wrap.tall{height:320px}
+
+/* ── Side ── */
+.side{display:grid;gap:16px}
+.lane-row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
+.lane-row:last-child{border-bottom:0}
+.lane-name{font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lane-count{color:var(--blue);font-size:17px;font-weight:900}
+
+/* ── Table ── */
+.table-wrap{overflow:auto;max-height:400px;border:1px solid var(--border);border-radius:var(--radius-sm)}
+table{width:100%;border-collapse:collapse;background:var(--card)}
+th,td{padding:10px 12px;border-bottom:1px solid var(--border);text-align:left;font-size:12px;white-space:nowrap}
+th{position:sticky;top:0;background:#EFF6FF;color:var(--navy);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;z-index:1}
+tr:hover td{background:#F8FAFC}
+.badge{display:inline-flex;align-items:center;min-height:22px;border-radius:999px;padding:0 10px;font-size:11px;font-weight:800}
+.badge.delivered{background:var(--green-bg);color:#047857}
+.badge.transit{background:var(--blue-light);color:#1D4ED8}
+.badge.pending{background:var(--amber-bg);color:#92400E}
+.badge.delayed{background:var(--red-bg);color:#991B1B}
+
+/* ── Report Buttons ── */
+.report-bar{display:flex;align-items:center;gap:12px;margin-top:8px;flex-wrap:wrap}
+.gen-label{font-size:13px;color:var(--slate);font-weight:600}
+
+/* ── Empty State ── */
+.empty-state{display:grid;place-items:center;min-height:320px;border:2px dashed var(--blue-border);border-radius:var(--radius);background:var(--blue-light);text-align:center;padding:32px;margin-top:16px}
+.empty-state strong{font-size:16px;color:var(--ink)}
+.empty-state p{color:var(--slate);font-size:13px;margin-top:6px}
+
+/* ── Toast ── */
+.toast{position:fixed;right:20px;bottom:20px;max-width:440px;padding:14px 20px;border-radius:var(--radius-sm);background:var(--ink);color:#fff;font-size:13px;font-weight:600;opacity:0;pointer-events:none;transform:translateY(8px);transition:all .15s;z-index:100;box-shadow:var(--shadow-lg)}
 .toast.show{opacity:1;transform:translateY(0)}
-.progress-overlay{position:fixed;inset:0;display:grid;place-items:center;background:rgba(15,23,42,.45);z-index:20}
-.progress-card{max-width:420px;width:calc(100% - 32px);padding:24px;border-radius:12px;background:#fff;text-align:center;box-shadow:0 20px 60px rgba(15,23,42,.3)}
-.progress-card h3{font-size:17px;margin-bottom:8px}.progress-card p{color:#64748b;font-size:13px;margin-bottom:16px}
-.progress-track{height:6px;border-radius:3px;background:#e8eef5;overflow:hidden}
-.progress-fill{height:100%;width:0%;border-radius:3px;background:#2563eb;transition:width .2s}
-.lane-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid #e8eef5}
-.lane-row:last-child{border-bottom:0}.lane-name{font-size:12px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.lane-count{color:#2563eb;font-size:17px;font-weight:900}
-@media(max-width:1180px){.kpis{grid-template-columns:repeat(3,1fr)}.main-grid{grid-template-columns:1fr}}
-@media(max-width:860px){.upload-row,.filters,.charts,.kpis{grid-template-columns:1fr}.topbar{flex-direction:column}.actions{justify-content:flex-start}h1{font-size:24px}}
+
+/* ── Progress ── */
+.progress-overlay{position:fixed;inset:0;display:grid;place-items:center;background:rgba(15,23,42,.45);z-index:200}
+.progress-card{max-width:420px;width:calc(100% - 32px);padding:28px;border-radius:var(--radius);background:var(--card);text-align:center;box-shadow:0 20px 60px rgba(15,23,42,.3)}
+.progress-card h3{font-size:17px;margin-bottom:6px}
+.progress-card p{color:var(--slate);font-size:13px;margin-bottom:16px}
+.progress-track{height:6px;border-radius:3px;background:var(--border);overflow:hidden}
+.progress-fill{height:100%;width:0%;border-radius:3px;background:var(--blue);transition:width .2s}
+
+/* ── Footer ── */
+.footer{text-align:center;color:var(--muted);font-size:11px;margin-top:32px;padding-top:16px;border-top:1px solid var(--border)}
+
+@media(max-width:1200px){.kpis{grid-template-columns:repeat(3,1fr)}.main-grid{grid-template-columns:1fr}}
+@media(max-width:860px){.upload-row,.filters,.charts-grid{grid-template-columns:1fr}.brand-bar{flex-direction:column;align-items:flex-start;gap:12px}.kpis{grid-template-columns:1fr 1fr}.brand-right{width:100%;flex-wrap:wrap}}
 </style>
 </head>
 <body>
 <div class="shell">
-<header class="topbar">
-  <div>
-    <p class="eyebrow">Multi-customer logistics</p>
-    <h1>Logistics dashboard</h1>
-    <div class="meta">
-      <span id="periodLabel">Awaiting CSV</span>
-      <span class="pill" id="countPill">0 shipments</span>
-      <span class="pill" id="sourcePill">No files loaded</span>
+  <!-- ── Brand Bar ── -->
+  <div class="brand-bar">
+    <div class="brand-left">
+      <img src="logo-light.png" alt="Logo" class="brand-logo" onerror="this.style.display='none'">
+      <div>
+        <div class="brand-title">MIS Dashboard</div>
+        <div class="brand-sub">Sonic Business Solutions</div>
+      </div>
+    </div>
+    <div class="brand-right">
+      <div class="meta-row" style="margin:0;gap:8px">
+        <span class="pill" id="countPill">0 shipments</span>
+        <span class="pill" id="sourcePill">No files</span>
+      </div>
     </div>
   </div>
-  <div class="actions">
-    <button class="ghost" id="sampleBtn" type="button"><i data-lucide="database"></i><span>Load sample</span></button>
-    <button class="ghost icon-only" id="resetBtn" type="button"><i data-lucide="rotate-ccw"></i></button>
-    <button class="primary" id="pptBtn" type="button" disabled><i data-lucide="presentation"></i><span>PPTs</span></button>
-    <button class="primary" id="wordBtn" type="button" disabled style="background:#1e3a5f;border-color:#1e3a5f"><i data-lucide="file-text"></i><span>Word</span></button>
-    <button class="primary" id="pdfBtn" type="button" disabled style="background:#991b1b;border-color:#991b1b"><i data-lucide="file"></i><span>PDF</span></button>
-    <a class="download-link hidden" id="pptLink" href="#" download>Download</a>
-  </div>
-</header>
+
+  <!-- ── Upload + Filters ── -->
   <div class="upload-row">
-  <div class="drop-zone" id="dropZone">
-    <span class="drop-icon"><i data-lucide="upload-cloud"></i></span>
-    <span><strong>Drop CSV files or click to browse</strong><span>Upload multiple CSV files — supports sonic_b2b and Customer MIS formats.</span></span>
+    <div class="drop-zone" id="dropZone">
+      <span class="drop-icon"><i data-lucide="upload-cloud"></i></span>
+      <span><strong>Drop CSV files or click to browse</strong><span class="sub">Supports sonic_b2b and Customer MIS formats</span></span>
+    </div>
+    <input class="file-input-hidden" id="csvInput" type="file" accept=".csv" multiple>
+    <div class="filters">
+      <div><label class="filter-label" for="periodFilter">Period</label><select id="periodFilter"></select></div>
+      <div><label class="filter-label" for="warehouseFilter">Warehouse</label><select id="warehouseFilter"></select></div>
+      <div><label class="filter-label" for="stateFilter">State</label><select id="stateFilter"></select></div>
+      <div><label class="filter-label" for="statusFilter">Status</label>
+        <select id="statusFilter">
+          <option value="all">All statuses</option>
+          <option value="delivered">Delivered</option>
+          <option value="in_transit">In transit</option>
+          <option value="delayed">Delayed</option>
+          <option value="pending">Pending</option>
+        </select>
+      </div>
+    </div>
   </div>
-  <input class="file-input-hidden" id="csvInput" type="file" accept=".csv" multiple>
-  <div class="filters">
-    <div><label class="filter-label" for="periodFilter">Period</label><select id="periodFilter"></select></div>
-    <div><label class="filter-label" for="warehouseFilter">Warehouse</label><select id="warehouseFilter"></select></div>
-    <div><label class="filter-label" for="stateFilter">State</label><select id="stateFilter"></select></div>
-    <div><label class="filter-label" for="statusFilter">Status</label>
-      <select id="statusFilter"><option value="all">All statuses</option><option value="delivered">Delivered</option><option value="in_transit">In transit</option><option value="delayed">Delayed</option><option value="pending">Pending</option></select></div>
-  </div>
+
+  <!-- ── Datasets Bar ── -->
+  <section id="datasetsBar" class="datasets-bar hidden">
+    <span class="label">Datasets:</span>
+    <div id="datasetsList"></div>
+  </section>
+
+  <!-- ── Dashboard ── -->
+  <main id="dashboard" class="hidden">
+    <!-- KPIs -->
+    <section class="kpis">
+      <article class="kpi-card blue"><div class="kpi-label">Shipments</div><div class="kpi-value" id="shipmentsMetric">0</div><div class="kpi-sub" id="shipmentsSub">No records</div></article>
+      <article class="kpi-card green"><div class="kpi-label">Delivered</div><div class="kpi-value" id="deliveredMetric">0%</div><div class="kpi-sub" id="deliveredSub">0 delivered</div></article>
+      <article class="kpi-card red"><div class="kpi-label">Open Delayed</div><div class="kpi-value" id="delayedMetric">0</div><div class="kpi-sub" id="delayedSub">0 late</div></article>
+      <article class="kpi-card amber"><div class="kpi-label">Package Value</div><div class="kpi-value" id="valueMetric">0</div><div class="kpi-sub" id="valueSub">Invoice value</div></article>
+      <article class="kpi-card blue"><div class="kpi-label">Boxes</div><div class="kpi-value" id="boxesMetric">0</div><div class="kpi-sub" id="boxesSub">0 kg</div></article>
+      <article class="kpi-card green"><div class="kpi-label">Avg TAT</div><div class="kpi-value" id="tatMetric">0d</div><div class="kpi-sub" id="tatSub">On-time rate</div></article>
+    </section>
+
+    <!-- Charts -->
+    <section class="main-grid">
+      <div class="charts-grid">
+        <article class="card">
+          <div class="card-head"><div><div class="card-title">Shipment Status</div><div class="card-note" id="statusNote">Current status distribution</div></div></div>
+          <div class="chart-wrap tall"><canvas id="statusChart"></canvas></div>
+        </article>
+        <article class="card">
+          <div class="card-head"><div><div class="card-title">Manifest Trend</div><div class="card-note">Daily shipment volume</div></div></div>
+          <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+        </article>
+        <article class="card">
+          <div class="card-head"><div><div class="card-title">Top Destination States</div><div class="card-note">By shipment count</div></div></div>
+          <div class="chart-wrap"><canvas id="stateChart"></canvas></div>
+        </article>
+        <article class="card">
+          <div class="card-head"><div><div class="card-title">Open Shipment Aging</div><div class="card-note" id="agingNote">Based on pickup date</div></div></div>
+          <div class="chart-wrap"><canvas id="agingChart"></canvas></div>
+        </article>
+      </div>
+      <div class="side">
+        <article class="card">
+          <div class="card-head"><div><div class="card-title">Top Lanes</div><div class="card-note">Origin to destination</div></div></div>
+          <div class="card-body" id="laneList"></div>
+        </article>
+        <article class="card">
+          <div class="card-head"><div><div class="card-title">Priority Shipments</div><div class="card-note" id="priorityNote">Open and delayed</div></div></div>
+          <div class="table-wrap"><table><thead><tr><th>Order</th><th>Destination</th><th>Status</th><th>Promise</th><th>Amount</th></tr></thead><tbody id="priorityBody"></tbody></table></div>
+        </article>
+      </div>
+    </section>
+
+    <!-- Report Generation -->
+    <div style="margin-top:20px;padding:16px 20px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+        <div>
+          <div style="font-size:15px;font-weight:700;color:var(--ink)">Generate Reports</div>
+          <div style="font-size:12px;color:var(--gray);margin-top:2px">Download PPT, Word, or PDF for each customer</div>
+        </div>
+        <div class="report-bar">
+          <button class="btn-blue" id="pptBtn" disabled><i data-lucide="presentation"></i> PPTs</button>
+          <button class="btn-primary" id="wordBtn" disabled><i data-lucide="file-text"></i> Word</button>
+          <button class="btn-red" id="pdfBtn" disabled><i data-lucide="file"></i> PDF</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <section id="emptyState" class="empty-state">
+    <div><strong>No logistics CSVs loaded yet.</strong><p>Drop CSV files above or click to browse.</p></div>
+  </section>
 </div>
-<section id="datasetsBar" class="datasets-bar hidden"><span class="label">Datasets:</span><div id="datasetsList"></div></section>
-<main id="dashboard" class="hidden">
-<section class="kpis">
-  <article class="card kpi blue"><div class="kpi-label">Shipments</div><div class="kpi-value" id="shipmentsMetric">0</div><div class="kpi-sub" id="shipmentsSub">No records</div></article>
-  <article class="card kpi green"><div class="kpi-label">Delivered rate</div><div class="kpi-value" id="deliveredMetric">0%</div><div class="kpi-sub" id="deliveredSub">0 delivered</div></article>
-  <article class="card kpi red"><div class="kpi-label">Open delayed</div><div class="kpi-value" id="delayedMetric">0</div><div class="kpi-sub" id="delayedSub">0 late delivered</div></article>
-  <article class="card kpi amber"><div class="kpi-label">Package value</div><div class="kpi-value" id="valueMetric">0</div><div class="kpi-sub" id="valueSub">Invoice value</div></article>
-  <article class="card kpi blue"><div class="kpi-label">Boxes</div><div class="kpi-value" id="boxesMetric">0</div><div class="kpi-sub" id="boxesSub">0 kg</div></article>
-  <article class="card kpi green"><div class="kpi-label">Avg delivery TAT</div><div class="kpi-value" id="tatMetric">0d</div><div class="kpi-sub" id="tatSub">Pickup to delivery</div></article>
-</section>
-<section class="main-grid">
-  <div class="charts">
-    <article class="card panel"><div class="panel-head"><div><h2>Shipment status</h2><p class="note" id="statusNote">Current status split</p></div></div><canvas id="statusCanvas"></canvas></article>
-    <article class="card panel"><div class="panel-head"><div><h2>Manifest trend</h2><p class="note">Daily shipment volume</p></div></div><canvas id="trendCanvas"></canvas></article>
-    <article class="card panel"><div class="panel-head"><div><h2>Top destination states</h2><p class="note">Shipment count by state</p></div></div><canvas id="stateCanvas"></canvas></article>
-    <article class="card panel"><div class="panel-head"><div><h2>Open shipment aging</h2><p class="note" id="agingNote">Based on pickup date</p></div></div><canvas id="agingCanvas"></canvas></article>
-  </div>
-  <div class="side">
-    <article class="card panel"><div class="panel-head"><div><h2>Top lanes</h2><p class="note">Origin to destination</p></div></div><div id="laneList"></div></article>
-    <article class="card panel"><div class="panel-head"><div><h2>Priority shipments</h2><p class="note" id="priorityNote">Open and delayed items first</p></div></div>
-      <div class="table-wrap"><table><thead><tr><th>Order</th><th>Destination</th><th>Status</th><th>Promise</th><th>Last scan</th><th>Amount</th></tr></thead><tbody id="priorityBody"></tbody></table></div></article>
-  </div>
-</section>
-</main>
-<section id="emptyState" class="empty"><div><strong>No logistics CSVs loaded yet.</strong><p style="margin-top:8px;">Drop CSV files or click to browse.</p></div></section>
-</div>
+
 <div id="toast" class="toast"></div>
 <div id="progressOverlay" class="progress-overlay hidden">
   <div class="progress-card"><h3>Generating reports...</h3><p id="progressLabel">Starting...</p><div class="progress-track"><div class="progress-fill" id="progressFill"></div></div></div>
 </div>
-<script src="vendor/jszip.min.js"></script>
+
 <script>
-const COLORS={blue:'#2563eb',green:'#059669',amber:'#d97706',red:'#dc2626',purple:'#7c3aed',teal:'#0f766e',gray:'#64748b',ink:'#0f172a'};
-const BACKEND_URL=window.location.origin+'/api/generate';
+const COLORS={
+  blue:'rgba(37,99,235,1)',blueBg:'rgba(37,99,235,0.12)',
+  green:'rgba(5,150,105,1)',greenBg:'rgba(5,150,235,0.12)',
+  amber:'rgba(217,119,6,1)',amberBg:'rgba(217,119,6,0.12)',
+  red:'rgba(220,38,38,1)',redBg:'rgba(220,38,38,0.12)',
+  purple:'rgba(124,58,237,1)',purpleBg:'rgba(124,58,237,0.12)',
+  teal:'rgba(15,118,110,1)',tealBg:'rgba(15,118,110,0.12)',
+  gray:'rgba(100,116,139,1)',grayBg:'rgba(100,116,139,0.12)',
+  ink:'rgba(15,23,42,1)',
+  donut:['rgba(37,99,235,1)','rgba(5,150,105,1)','rgba(217,119,6,1)','rgba(220,38,38,1)','rgba(124,58,237,1)','rgba(100,116,139,1)','rgba(15,118,110,1)','rgba(234,179,8,1)']
+};
+const CHART_DEFAULTS={responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{usePointStyle:true,pointStyle:'circle',padding:12,font:{size:11,weight:600}}}}};
+
 const SCHEMAS={
   sonic_b2b:{detect:h=>h.includes('Order id'),fields:{id:'Order id',lrn:'LRN',boxes:'No of boxes',client:'Client',manifest:'Manifest Date',pickup:'Pickup Date',expected:'Expected Date',promise:'Promise Date',delivered:'Delivered Date',origin:'Origin City',destination:'Destination City',warehouse:'Client Location/warehouse',status:'Current Status',statusType:'Status Type',remarks:'Remarks',amount:'Package Amount',weight:'Weight',attempts:'Attempt Count',lastScan:'Last Scan Date',lastScanLocation:'Last Scan Location',zone:'Invoice Zone',state:'State'}},
   customer_mis:{detect:h=>h.includes('Reference Number')&&h.includes('Customer Code'),fields:{id:'Reference Number',lrn:'Reference Number',boxes:'Num Pieces',client:'Customer Code',manifest:'Created at',pickup:'Last Pickup Completed Time',expected:'Expected Delivery Date',promise:'Expected Delivery Date',delivered:'Delivered Time',origin:'Sender City',destination:'Consignee City',warehouse:'Origin Hub Name',status:'Status',statusType:'Status',remarks:'Delivery Failure Reason',amount:'Declared Value',weight:'Weight',attempts:null,lastScan:null,lastScanLocation:'Destination Hub Name',zone:null,state:'Consignee City'}}
@@ -138,15 +282,17 @@ const SCHEMAS={
 const MERGED_INDEX=-2;
 const app={datasets:[],activeIndex:-1,records:[],filtered:[],source:'',uploadedFiles:[],asOf:new Date(),filters:{period:'all',warehouse:'all',state:'all',status:'all'}};
 const $=id=>document.getElementById(id);
-const dom={dashboard:$('dashboard'),emptyState:$('emptyState'),periodLabel:$('periodLabel'),countPill:$('countPill'),sourcePill:$('sourcePill'),csvInput:$('csvInput'),dropZone:$('dropZone'),sampleBtn:$('sampleBtn'),resetBtn:$('resetBtn'),pptBtn:$('pptBtn'),wordBtn:$('wordBtn'),pdfBtn:$('pdfBtn'),pptLink:$('pptLink'),periodFilter:$('periodFilter'),warehouseFilter:$('warehouseFilter'),stateFilter:$('stateFilter'),statusFilter:$('statusFilter'),laneList:$('laneList'),priorityBody:$('priorityBody'),toast:$('toast'),datasetsBar:$('datasetsBar'),datasetsList:$('datasetsList'),progressOverlay:$('progressOverlay'),progressLabel:$('progressLabel'),progressFill:$('progressFill')};
+const dom={dashboard:$('dashboard'),emptyState:$('emptyState'),countPill:$('countPill'),sourcePill:$('sourcePill'),csvInput:$('csvInput'),dropZone:$('dropZone'),pptBtn:$('pptBtn'),wordBtn:$('wordBtn'),pdfBtn:$('pdfBtn'),periodFilter:$('periodFilter'),warehouseFilter:$('warehouseFilter'),stateFilter:$('stateFilter'),statusFilter:$('statusFilter'),laneList:$('laneList'),priorityBody:$('priorityBody'),toast:$('toast'),datasetsBar:$('datasetsBar'),datasetsList:$('datasetsList'),progressOverlay:$('progressOverlay'),progressLabel:$('progressLabel'),progressFill:$('progressFill')};
 const nf=new Intl.NumberFormat('en-IN'),mf=new Intl.NumberFormat('en-IN',{maximumFractionDigits:0});
 const df=new Intl.NumberFormat('en-IN',{maximumFractionDigits:1});
 const dtf=new Intl.DateTimeFormat('en-IN',{day:'2-digit',month:'short',year:'numeric'});
 const sdf=new Intl.DateTimeFormat('en-IN',{day:'2-digit',month:'short'});
 const DAY=864e5;
+let charts={};
+
 document.addEventListener('DOMContentLoaded',init);
 
-function init(){bindEvents();setBaseFilterOptions();drawEmptyCharts();createIcons()}
+function init(){bindEvents();setBaseFilterOptions();createIcons()}
 
 function bindEvents(){
   dom.dropZone.addEventListener('click',()=>dom.csvInput.click());
@@ -154,13 +300,11 @@ function bindEvents(){
   ['dragenter','dragover'].forEach(t=>dom.dropZone.addEventListener(t,e=>{e.preventDefault();dom.dropZone.classList.add('dragging')}));
   ['dragleave','drop'].forEach(t=>dom.dropZone.addEventListener(t,e=>{e.preventDefault();dom.dropZone.classList.remove('dragging')}));
   dom.dropZone.addEventListener('drop',e=>{const f=Array.from(e.dataTransfer.files||[]);if(f.length)readFiles(f)});
-  dom.sampleBtn.addEventListener('click',()=>loadSample(true));
-  dom.resetBtn.addEventListener('click',resetFilters);
   dom.pptBtn.addEventListener('click',()=>createReports('ppt'));
   dom.wordBtn.addEventListener('click',()=>createReports('word'));
   dom.pdfBtn.addEventListener('click',()=>createReports('pdf'));
   [dom.periodFilter,dom.warehouseFilter,dom.stateFilter,dom.statusFilter].forEach(s=>s.addEventListener('change',()=>{app.filters.period=dom.periodFilter.value;app.filters.warehouse=dom.warehouseFilter.value;app.filters.state=dom.stateFilter.value;app.filters.status=dom.statusFilter.value;applyFilters()}));
-  window.addEventListener('resize',debounce(()=>{if(app.filtered.length)renderCharts(buildAggregates(app.filtered))},160))
+  window.addEventListener('resize',debounce(()=>{if(app.filtered.length)renderCharts(buildAggregates(app.filtered))},200))
 }
 
 function detectSchema(header){for(const[k,p]of Object.entries(SCHEMAS))if(p.detect(header))return k;return header.some(h=>/order/i.test(h))?'sonic_b2b':'customer_mis'}
@@ -175,16 +319,6 @@ function readFiles(files){
     r.onerror=()=>{showToast(`Error reading ${f.name}`);done++};
     r.readAsText(f)
   })
-}
-
-async function loadSample(announce){
-  try{
-    const res=await fetch('./sonic_b2b.csv',{cache:'no-store'});
-    if(!res.ok)throw Error();
-    const text=await res.text(),ds=loadCsv(text,'sonic_b2b.csv');
-    if(ds){renderDatasetsBar();switchToDataset(app.datasets.indexOf(ds));if(announce)showToast('Loaded sample.')}
-    else if(announce)showToast('Sample CSV has no data.')
-  }catch(e){if(announce)showToast('Sample CSV not found. Try uploading your own file.')}
 }
 
 function loadCsv(text,source){
@@ -217,8 +351,111 @@ function normalizeRow(row,index,fields,schema){
     attempts:parseNum(g('attempts')),isDelivered:isDelivered(st)||isDelivered(stt)||Boolean(dd)}
 }
 
-function guessState(c){const m={bengaluru:'Karnataka',bangalore:'Karnataka',mumbai:'Maharashtra',pune:'Maharashtra',nagpur:'Maharashtra',thane:'Maharashtra',delhi:'Delhi','new delhi':'Delhi',hyderabad:'Telangana',chennai:'Tamil Nadu',kolkata:'West Bengal',ahmedabad:'Gujarat',jaipur:'Rajasthan',lucknow:'Uttar Pradesh',chandigarh:'Chandigarh'};(c||'').toLowerCase();for(const[k,v]of Object.entries(m))if((c||'').toLowerCase().includes(k))return v;return c||'Unknown'}
+// ── Build Summary & Aggregates ──
+function buildSummary(records){
+  const shipments=records.length,delivered=records.filter(r=>r.isDelivered).length,open=shipments-delivered;
+  const flags=records.map(getFlags),delayedOpen=flags.filter(f=>f.delayedOpen).length,lateDelivered=flags.filter(f=>f.lateDelivered).length;
+  const dwp=records.filter(r=>r.isDelivered&&r.deliveredDate&&r.promiseDate),onTime=dwp.filter(r=>!getFlags(r).lateDelivered).length;
+  const tat=records.filter(r=>r.isDelivered&&r.deliveredDate&&(r.pickupDate||r.manifestDate));
+  const avgTat=tat.length?sum(tat,r=>diffDays(r.pickupDate||r.manifestDate,r.deliveredDate))/tat.length:0;
+  const amount=sum(records,r=>r.amount),weight=sum(records,r=>r.weight);
+  return{shipments,delivered,open,delayedOpen,lateDelivered,attempted:records.filter(r=>r.attempts>0).length,
+    boxes:Math.round(sum(records,r=>r.boxes)),amount,weight,
+    deliveredRate:shipments?Math.round(delivered/shipments*100):0,
+    onTimeRate:dwp.length?Math.round(onTime/dwp.length*100):0,avgTat,
+    avgTatLabel:`${df.format(avgTat)}d`,valueLabel:fmtMoney(amount),weightLabel:`${df.format(weight)} kg`}
+}
 
+function buildAggregates(records){
+  return{
+    status:top(countBy(records,r=>r.status||'Unknown'),6),
+    states:top(countBy(records,r=>r.state||'Unknown'),8),
+    lanes:top(countBy(records,r=>`${r.origin} -> ${r.destination}`),10),
+    trend:buildTrend(records),
+    aging:buildAging(records)
+  }
+}
+
+function buildTrend(records){
+  const m=new Map();records.forEach(r=>{const d=r.manifestDate||r.pickupDate||r.deliveredDate;if(!d)return;const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;m.set(k,(m.get(k)||0)+1)});
+  return Array.from(m.entries()).sort((a,b)=>a[0].localeCompare(b[0])).map(([k,v])=>({key:k,label:sdf.format(parseDate(k)),value:v}))
+}
+
+function buildAging(records){
+  const b=[{label:'0-2 days',value:0},{label:'3-5 days',value:0},{label:'6-8 days',value:0},{label:'9+ days',value:0}];
+  records.filter(r=>!r.isDelivered).forEach(r=>{const s=r.pickupDate||r.manifestDate||r.lastScanDate,age=s?Math.max(0,Math.floor(diffDays(s,app.asOf))):0;
+    if(age<=2)b[0].value++;else if(age<=5)b[1].value++;else if(age<=8)b[2].value++;else b[3].value++});
+  return b
+}
+
+// ── Rendering ──
+function render(){
+  if(!app.records.length){dom.dashboard.classList.add('hidden');dom.emptyState.classList.remove('hidden');dom.pptBtn.disabled=!0;dom.wordBtn.disabled=!0;dom.pdfBtn.disabled=!0;return}
+  dom.dashboard.classList.remove('hidden');dom.emptyState.classList.add('hidden');
+  dom.pptBtn.disabled=!1;dom.wordBtn.disabled=!1;dom.pdfBtn.disabled=!1;
+  const s=buildSummary(app.filtered),a=buildAggregates(app.filtered);
+  dom.countPill.textContent=`${nf.format(s.shipments)} shipments`;
+  dom.sourcePill.textContent=app.source;
+  $('shipmentsMetric').textContent=nf.format(s.shipments);$('shipmentsSub').textContent=`As of ${formatDate(app.asOf)}`;
+  $('deliveredMetric').textContent=`${s.deliveredRate}%`;$('deliveredSub').textContent=`${nf.format(s.delivered)} delivered, ${nf.format(s.open)} open`;
+  $('delayedMetric').textContent=nf.format(s.delayedOpen);$('delayedSub').textContent=`${nf.format(s.lateDelivered)} late delivered`;
+  $('valueMetric').textContent=s.valueLabel;$('valueSub').textContent=`${nf.format(s.attempted)} attempted`;
+  $('boxesMetric').textContent=nf.format(s.boxes);$('boxesSub').textContent=`${s.weightLabel} total`;
+  $('tatMetric').textContent=s.avgTatLabel;$('tatSub').textContent=`${s.onTimeRate}% on-time`;
+  $('statusNote').textContent=`${nf.format(s.open)} open`;$('agingNote').textContent=`Aging as of ${formatDate(app.asOf)}`;
+  $('priorityNote').textContent=`${nf.format(s.delayedOpen)} delayed`;
+  renderCharts(a);renderLanes(a.lanes);renderPriority(app.filtered);createIcons()
+}
+
+function renderCharts(a){
+  // Destroy existing charts
+  Object.values(charts).forEach(c=>{if(c)c.destroy()});
+  charts={};
+
+  // Status Donut
+  const statusData=a.status.filter(e=>e.value>0);
+  charts.status=new Chart($('statusChart'),{
+    type:'doughnut',
+    data:{labels:statusData.map(e=>e.label),datasets:[{data:statusData.map(e=>e.value),backgroundColor:COLORS.donut.slice(0,statusData.length),borderWidth:2,borderColor:'#fff',hoverBorderWidth:3}]},
+    options:{...CHART_DEFAULTS,cutout:'62%',plugins:{...CHART_DEFAULTS.plugins,legend:{...CHART_DEFAULTS.plugins.legend,position:'right'},tooltip:{callbacks:{label:ctx=>{const t=ctx.dataset.data.reduce((a,b)=>a+b,0);return ` ${ctx.label}: ${nf.format(ctx.parsed)} (${Math.round(ctx.parsed/t*100)}%)`}}}}}
+  });
+
+  // Trend Line
+  const trendLast=a.trend.slice(-22);
+  charts.trend=new Chart($('trendChart'),{
+    type:'line',
+    data:{labels:trendLast.map(t=>t.label),datasets:[{label:'Shipments',data:trendLast.map(t=>t.value),borderColor:COLORS.blue,backgroundColor:COLORS.blueBg,fill:true,tension:.35,pointRadius:3,pointBackgroundColor:COLORS.blue,pointBorderColor:'#fff',pointBorderWidth:2,pointHoverRadius:6}]},
+    options:{...CHART_DEFAULTS,scales:{x:{grid:{display:false},ticks:{font:{size:10},maxTicksLimit:8}},y:{beginAtZero:true,grid:{color:'rgba(0,0,0,0.05)'},ticks:{font:{size:10}}}},plugins:{...CHART_DEFAULTS.plugins,legend:{display:false}}}
+  });
+
+  // State Horizontal Bar
+  charts.states=new Chart($('stateChart'),{
+    type:'bar',
+    data:{labels:a.states.map(e=>e.label),datasets:[{label:'Shipments',data:a.states.map(e=>e.value),backgroundColor:COLORS.teal,borderRadius:4,barPercentage:.7}]},
+    options:{...CHART_DEFAULTS,indexAxis:'y',scales:{x:{beginAtZero:true,grid:{color:'rgba(0,0,0,0.05)'},ticks:{font:{size:10}}},y:{grid:{display:false},ticks:{font:{size:11,weight:600}}}},plugins:{...CHART_DEFAULTS.plugins,legend:{display:false}}}
+  });
+
+  // Aging Vertical Bar
+  charts.aging=new Chart($('agingChart'),{
+    type:'bar',
+    data:{labels:a.aging.map(e=>e.label),datasets:[{label:'Open Shipments',data:a.aging.map(e=>e.value),backgroundColor:[COLORS.green,COLORS.amber,'rgba(249,115,22,1)',COLORS.red],borderRadius:6,barPercentage:.6}]},
+    options:{...CHART_DEFAULTS,scales:{x:{grid:{display:false},ticks:{font:{size:11,weight:600}}},y:{beginAtZero:true,grid:{color:'rgba(0,0,0,0.05)'},ticks:{font:{size:10}}}},plugins:{...CHART_DEFAULTS.plugins,legend:{display:false}}}
+  });
+}
+
+function renderLanes(lanes){
+  if(!lanes.length){dom.laneList.innerHTML='<p style="color:var(--gray);font-size:12px;padding:12px">No lanes.</p>';return}
+  dom.laneList.innerHTML=lanes.slice(0,8).map(l=>{const p=l.label.split(' -> ');
+    return`<div class="lane-row"><div><div class="lane-name" title="${esc(l.label)}">${esc(p[0]||'')} &rarr; ${esc(p[1]||'')}</div></div><div class="lane-count">${nf.format(l.value)}</div></div>`}).join('')
+}
+
+function renderPriority(records){
+  const rows=priorityRecords(records).slice(0,14);
+  dom.priorityBody.innerHTML=rows.map(r=>{const b=badgeFor(r);
+    return`<tr><td title="${esc(r.id)}">${esc(trunc(r.id,24))}</td><td>${esc(r.destination)}, ${esc(r.state)}</td><td><span class="badge ${b.className}">${esc(b.label)}</span></td><td>${formatDate(r.promiseDate)}</td><td>${fmtMoney(r.amount)}</td></tr>`}).join('')
+}
+
+// ── Datasets ──
 function getMergedRecords(){const a=[];app.datasets.forEach((ds,i)=>{ds.records.forEach(r=>{a.push(Object.assign({},r,{_datasetIndex:i,_datasetLabel:ds.client}))})});return a}
 
 function renderDatasetsBar(){
@@ -243,14 +480,7 @@ function removeDataset(index){
   if(app.datasets.length){switchToDataset(Math.max(0,app.activeIndex))}else{app.activeIndex=-1;app.records=[];app.filtered=[];renderDatasetsBar();dom.dashboard.classList.add('hidden');dom.emptyState.classList.remove('hidden');dom.pptBtn.disabled=!0;dom.wordBtn.disabled=!0;dom.pdfBtn.disabled=!0}
 }
 
-function parseCsv(text){
-  const clean=String(text||'').replace(/^\uFEFF/,'');const rows=[];let row=[],val='',q=false;
-  for(let i=0;i<clean.length;i++){const c=clean[i],n=clean[i+1];if(q){if(c==='"'&&n==='"'){val+='"';i++}else if(c==='"')q=false;else val+=c}else if(c==='"')q=true;else if(c===','){row.push(val);val=''}else if(c==='\n'){row.push(val);rows.push(row);row=[];val=''}else if(c!=='\r')val+=c}
-  if(val.length||row.length){row.push(val);rows.push(row)}
-  const header=(rows.shift()||[]).map(cleanCell);
-  return rows.filter(r=>r.some(c=>cleanCell(c))).map(r=>{const o={};header.forEach((h,i)=>{o[h]=cleanCell(r[i]||'')});return o})
-}
-
+// ── Filters ──
 function hydrateFilters(){setSelect(dom.periodFilter,buildMonths(app.records),'All periods');setSelect(dom.warehouseFilter,unique(app.records.map(r=>r.warehouse)),'All warehouses');setSelect(dom.stateFilter,unique(app.records.map(r=>r.state)),'All states');dom.statusFilter.value='all'}
 function setBaseFilterOptions(){setSelect(dom.periodFilter,[],'All periods');setSelect(dom.warehouseFilter,[],'All warehouses');setSelect(dom.stateFilter,[],'All states')}
 function buildMonths(records){const m=new Map();records.forEach(r=>{const d=r.manifestDate||r.pickupDate||r.deliveredDate;if(!d)return;const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;m.set(k,sdf.format(d))});return Array.from(m.entries()).sort((a,b)=>b[0].localeCompare(a[0])).map(([v,l])=>({value:v,label:l}))}
@@ -265,122 +495,251 @@ function applyFilters(){
   });render()
 }
 
-function render(){
-  if(!app.records.length){dom.dashboard.classList.add('hidden');dom.emptyState.classList.remove('hidden');dom.pptBtn.disabled=!0;dom.wordBtn.disabled=!0;dom.pdfBtn.disabled=!0;return}
-  dom.dashboard.classList.remove('hidden');dom.emptyState.classList.add('hidden');
-  const e=app.datasets.length>0;dom.pptBtn.disabled=!e;dom.wordBtn.disabled=!e;dom.pdfBtn.disabled=!e;
-  const s=buildSummary(app.filtered),a=buildAggregates(app.filtered);
-  dom.periodLabel.textContent=dateRangeLabel(app.filtered)||'Selected records';
-  dom.countPill.textContent=`${nf.format(s.shipments)} shipments`;
-  dom.sourcePill.textContent=app.source;
-  $('shipmentsMetric').textContent=nf.format(s.shipments);$('shipmentsSub').textContent=`As of ${formatDate(app.asOf)}`;
-  $('deliveredMetric').textContent=`${s.deliveredRate}%`;$('deliveredSub').textContent=`${nf.format(s.delivered)} delivered, ${nf.format(s.open)} open`;
-  $('delayedMetric').textContent=nf.format(s.delayedOpen);$('delayedSub').textContent=`${nf.format(s.lateDelivered)} late`;
-  $('valueMetric').textContent=s.valueLabel;$('valueSub').textContent=`${nf.format(s.attempted)} attempted`;
-  $('boxesMetric').textContent=nf.format(s.boxes);$('boxesSub').textContent=`${s.weightLabel} total`;
-  $('tatMetric').textContent=s.avgTatLabel;$('tatSub').textContent=`${s.onTimeRate}% on-time`;
-  $('statusNote').textContent=`${nf.format(s.open)} open`;$('agingNote').textContent=`Aging as of ${formatDate(app.asOf)}`;
-  $('priorityNote').textContent=`${nf.format(s.delayedOpen)} late`;
-  renderCharts(a);renderLanes(a.lanes);renderPriority(app.filtered);createIcons()
-}
-
-function buildSummary(records){
-  const shipments=records.length,delivered=records.filter(r=>r.isDelivered).length,open=shipments-delivered;
-  const flags=records.map(getFlags),delayedOpen=flags.filter(f=>f.delayedOpen).length,lateDelivered=flags.filter(f=>f.lateDelivered).length;
-  const dwp=records.filter(r=>r.isDelivered&&r.deliveredDate&&r.promiseDate),onTime=dwp.filter(r=>!getFlags(r).lateDelivered).length;
-  const tat=records.filter(r=>r.isDelivered&&r.deliveredDate&&(r.pickupDate||r.manifestDate));
-  const avgTat=tat.length?sum(tat,r=>diffDays(r.pickupDate||r.manifestDate,r.deliveredDate))/tat.length:0;
-  const amount=sum(records,r=>r.amount),weight=sum(records,r=>r.weight);
-  return{shipments,delivered,open,delayedOpen,lateDelivered,attempted:records.filter(r=>r.attempts>0).length,
-    boxes:Math.round(sum(records,r=>r.boxes)),amount,weight,
-    deliveredRate:shipments?Math.round(delivered/shipments*100):0,
-    onTimeRate:dwp.length?Math.round(onTime/dwp.length*100):0,avgTat,
-    avgTatLabel:`${df.format(avgTat)}d`,valueLabel:fmtMoney(amount),weightLabel:`${df.format(weight)} kg`}
-}
-
-function buildAggregates(records){return{status:top(countBy(records,r=>r.status||'Unknown'),6),states:top(countBy(records,r=>r.state||'Unknown'),8),lanes:top(countBy(records,r=>`${r.origin} -> ${r.destination}`),10),trend:buildTrend(records),aging:buildAging(records)}}
-function buildTrend(records){const m=new Map();records.forEach(r=>{const d=r.manifestDate||r.pickupDate||r.deliveredDate;if(!d)return;const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;m.set(k,(m.get(k)||0)+1)});return Array.from(m.entries()).sort((a,b)=>a[0].localeCompare(b[0])).map(([k,v])=>({key:k,label:sdf.format(parseDate(k)),value:v}))}
-function buildAging(records){const b=[{label:'0-2d',value:0},{label:'3-5d',value:0},{label:'6-8d',value:0},{label:'9d+',value:0}];records.filter(r=>!r.isDelivered).forEach(r=>{const s=r.pickupDate||r.manifestDate||r.lastScanDate,age=s?Math.max(0,Math.floor(diffDays(s,app.asOf))):0;if(age<=2)b[0].value++;else if(age<=5)b[1].value++;else if(age<=8)b[2].value++;else b[3].value++});return b}
-function renderCharts(a){drawDonut($('statusCanvas'),a.status,[COLORS.green,COLORS.blue,COLORS.amber,COLORS.red,COLORS.purple,COLORS.gray]);drawLine($('trendCanvas'),a.trend,COLORS.blue);drawHorizontalBars($('stateCanvas'),a.states,COLORS.teal);drawVerticalBars($('agingCanvas'),a.aging,COLORS.amber)}
-function drawEmptyCharts(){['statusCanvas','trendCanvas','stateCanvas','agingCanvas'].forEach(id=>drawEmpty(setupC($(id)),'No data'))}
-function renderLanes(lanes){if(!lanes.length){dom.laneList.innerHTML='<p class="note">No lanes.</p>';return}dom.laneList.innerHTML=lanes.slice(0,8).map(l=>{const p=l.label.split(' -> ');return`<div class="lane-row"><div><div class="lane-name" title="${esc(l.label)}">${esc(p[0]||'')} to ${esc(p[1]||'')}</div></div><div class="lane-count">${nf.format(l.value)}</div></div>`}).join('')}
-function renderPriority(records){const rows=priorityRecords(records).slice(0,14);dom.priorityBody.innerHTML=rows.map(r=>{const b=badgeFor(r);return`<tr><td title="${esc(r.id)}">${esc(trunc(r.id,24))}</td><td>${esc(r.destination)}, ${esc(r.state)}</td><td><span class="badge ${b.className}">${esc(b.label)}</span></td><td>${formatDate(r.promiseDate)}</td><td>${formatDate(r.lastScanDate)}</td><td>${fmtMoney(r.amount)}</td></tr>`}).join('')}
-
+// ── Flags & Helpers ──
 function getFlags(r){const pe=r.promiseDate?endOf(r.promiseDate):null;return{delayedOpen:!r.isDelivered&&pe&&pe.getTime()<startOf(app.asOf).getTime(),lateDelivered:r.isDelivered&&r.deliveredDate&&pe&&r.deliveredDate.getTime()>pe.getTime(),inTransit:!r.isDelivered&&/transit|dispatched|scan/i.test(`${r.status} ${r.remarks}`),pending:!r.isDelivered&&/pending|manifested/i.test(`${r.status} ${r.statusType}`)}}
 function badgeFor(r){const f=getFlags(r);if(f.delayedOpen)return{className:'delayed',label:'Delayed'};if(r.isDelivered)return{className:'delivered',label:'Delivered'};if(f.inTransit)return{className:'transit',label:'In transit'};return{className:'pending',label:r.status||'Open'}}
 function priorityRecords(r){return r.slice().sort((a,b)=>{const af=getFlags(a),bf=getFlags(b),as=af.delayedOpen?0:a.isDelivered?3:1,bs=bf.delayedOpen?0:b.isDelivered?3:1;if(as!==bs)return as-bs;return(a.promiseDate?a.promiseDate.getTime():Infinity)-(b.promiseDate?b.promiseDate.getTime():Infinity)})}
 
+// ── Report Generation ──
 async function createReports(format){
   if(!app.datasets.length){showToast('Load CSVs first.');return}
   const btn=format==='ppt'?dom.pptBtn:format==='word'?dom.wordBtn:dom.pdfBtn;
-  btn.disabled=!0;dom.progressOverlay.classList.remove('hidden');dom.pptLink.classList.add('hidden');
+  btn.disabled=true;showProgress(10,'Preparing data...');
+
   try{
-    const used=await tryBackend(format);
-    if(!used){showToast('Backend unavailable. Server-side reports require the Python backend.')}
+    if(format==='ppt'){await generatePptx();setProgress(100,'Done!')}
+    else if(format==='pdf'){await generatePdfReports();setProgress(100,'Done!')}
+    else{await tryBackend(format)}
   }catch(e){showToast(e.message||'Could not create reports.')}
-  finally{btn.disabled=!1;dom.progressOverlay.classList.add('hidden')}
+  finally{btn.disabled=false;setTimeout(()=>dom.progressOverlay.classList.add('hidden'),1200)}
 }
 
+// ── PPT Generation (Client-side with pptxgenjs) ──
+async function generatePptx(){
+  setProgress(20,'Creating PPT...');
+  const datasets=app.datasets.map(ds=>{const r=buildSummary(ds.records);const a=buildAggregates(ds.records);return{...ds,summary:r,agg:a}});
+  if(app.datasets.length>=2){const m=getMergedRecords();datasets.push({source:'merged',client:'All Customers (Consolidated)',records:m,summary:buildSummary(m),agg:buildAggregates(m)})}
+
+  for(let i=0;i<datasets.length;i++){
+    setProgress(20+i*(60/datasets.length),`Generating ${datasets[i].client}...`);
+    const ds=datasets[i],s=ds.summary,a=ds.agg;
+    const pptx=new PptxGenJS();pptx.layout='LAYOUT_WIDE';
+    pptx.author='Sonic Business Solutions';pptx.subject='MIS Dashboard Report';
+
+    // Colors
+    const NAVY='1E3A5F',BLUE='2563EB',WHITE='FFFFFF',DARK='0F172A',GRAY='64748B',LGRAY='94A3B8';
+
+    // ── Slide 1: Cover ──
+    let sl=pptx.addSlide();sl.addText('SONIC BUSINESS SOLUTIONS',{x:0,y:0,w:'100%',h:0.5,fontSize:10,fontFace:'Arial',color:WHITE,bold:true,fill:{color:NAVY},align:'center',valign:'middle'});
+    sl.addShape(pptx.shapes.LINE,{x:0.5,y:0.72,w:'90%',h:0,line:{color:BLUE,width:2}});
+    sl.addText('MIS Dashboard',{x:0.5,y:1.1,w:8,h:0.55,fontSize:28,fontFace:'Arial',color:DARK,bold:true});
+    sl.addText(ds.client,{x:0.52,y:1.7,w:7,h:0.35,fontSize:16,fontFace:'Arial',color:NAVY,bold:true});
+    sl.addText(s.period||'Selected Period',{x:0.52,y:2.05,w:7,h:0.25,fontSize:11,fontFace:'Arial',color:GRAY});
+
+    // KPI cards
+    const kpiData=[
+      ['Total Shipments',nf.format(s.shipments),'All consignments'],
+      ['Delivered',`${s.deliveredRate}%`,`${nf.format(s.delivered)} closed`],
+      ['On-Time Rate',`${s.onTimeRate}%`,`${nf.format(s.lateDelivered)} late`],
+      ['Open Delayed',nf.format(s.delayedOpen),`${nf.format(s.open)} open`]
+    ];
+    const kpiColors=['EBF5FF','D1FAE5','FEF3C7','FEE2E2'];
+    kpiData.forEach((k,i)=>{
+      sl.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:0.5+i*3.1,y:2.55,w:2.9,h:0.95,fill:{color:kpiColors[i]},rectRadius:0.1});
+      sl.addText(k[1],{x:0.6+i*3.1,y:2.6,w:2.7,h:0.35,fontSize:18,fontFace:'Arial',color:DARK,bold:true});
+      sl.addText(k[0],{x:0.6+i*3.1,y:2.95,w:2.7,h:0.2,fontSize:7.5,fontFace:'Arial',color:'475569',bold:true});
+      sl.addText(k[2],{x:0.6+i*3.1,y:3.15,w:2.7,h:0.2,fontSize:7,fontFace:'Arial',color:GRAY});
+    });
+
+    // Insights
+    const insights=[
+      `${s.deliveredRate}% closure across ${nf.format(s.shipments)} shipments; ${nf.format(s.open)} remain open.`,
+      `${s.onTimeRate}% on-time delivery; ${nf.format(s.lateDelivered)} late delivered.`,
+      `${nf.format(s.delayedOpen)} open past promise — require ETA updates.`,
+      a.states.length?`${a.states[0].label} is top destination state.`:'',
+      a.lanes.length?`Top lane: ${a.lanes[0].label}.`:''
+    ].filter(Boolean);
+    sl.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:0.5,y:4.0,w:'90%',h:1.5,fill:{color:'F8FAFC'},line:{color:'E2E8F0',width:0.5},rectRadius:0.1});
+    sl.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:0.5,y:4.0,w:0.06,h:1.5,fill:{color:BLUE}});
+    sl.addText('Executive Summary',{x:0.7,y:4.1,w:4,h:0.25,fontSize:9.5,fontFace:'Arial',color:DARK,bold:true});
+    insights.forEach((ins,idx)=>{sl.addText(`• ${ins}`,{x:0.7,y:4.38+idx*0.22,w:11,h:0.22,fontSize:8,fontFace:'Arial',color:'334155'})});
+
+    // Footer
+    sl.addShape(pptx.shapes.LINE,{x:0.5,y:6.82,w:'90%',h:0,line:{color:'CBD5E1',width:0.5}});
+    sl.addText(`Generated ${new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}`,{x:0.5,y:6.85,w:8,h:0.2,fontSize:7,fontFace:'Arial',color:LGRAY});
+    sl.addText(ds.client,{x:9,y:6.85,w:4,h:0.2,fontSize:7,fontFace:'Arial',color:NAVY,bold:true,align:'right'});
+
+    // ── Slide 2: Charts ──
+    sl=pptx.addSlide();
+    sl.addText('Performance Overview',{x:0.5,y:0.15,w:8,h:0.35,fontSize:20,fontFace:'Arial',color:DARK,bold:true});
+    sl.addText(s.period||'Selected Period',{x:0.5,y:0.48,w:8,h:0.2,fontSize:9,fontFace:'Arial',color:GRAY});
+    sl.addShape(pptx.shapes.LINE,{x:0.5,y:0.72,w:'90%',h:0,line:{color:'E2E8F0',width:0.5}});
+
+    // Status Chart
+    const sc=a.status.filter(e=>e.value>0);
+    if(sc.length>=2){
+      sl.addChart(pptx.charts.DOUGHNUT,{
+        labels:sc.map(e=>e.label),
+        datasets:[{data:sc.map(e=>e.value)}]
+      },{x:0.3,y:0.85,w:5.5,h:3.2,showLegend:true,legendPos:'b',legendFontSize:8,showTitle:true,title:'Shipment Status',titleFontSize:11,titleColor:DARK,chartColors:['2563EB','059669','D97706','DC2626','7C3AED','64748B','0F766E','EAB308']});
+    }
+
+    // Trend Chart
+    const td=a.trend.slice(-14);
+    if(td.length){
+      sl.addChart(pptx.charts.LINE,{
+        labels:td.map(t=>t.label),
+        datasets:[{name:'Shipments',data:td.map(t=>t.value)}]
+      },{x:6.2,y:0.85,w:6.5,h:2.8,showLegend:false,showTitle:true,title:'Manifest Trend',titleFontSize:11,titleColor:DARK,lineDataSymbol:'circle',lineDataSymbolSize:6,lineSize:2,chartColors:['2563EB'],valAxisMinVal:0});
+    }
+
+    // KPIs Row
+    const kpis2=[['Package Value',s.valueLabel,'Declared value'],['Total Boxes',nf.format(s.boxes),s.weightLabel],['Avg TAT',s.avgTatLabel,'Pickup to delivery'],['Attempted',nf.format(s.attempted),'With attempts']];
+    kpis2.forEach((k,i)=>{
+      sl.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:0.5+i*3.1,y:4.3,w:2.9,h:0.85,fill:{color:'FFFFFF'},line:{color:'E2E8F0',width:0.5},rectRadius:0.08});
+      sl.addText(k[1],{x:0.6+i*3.1,y:4.35,w:2.7,h:0.3,fontSize:16,fontFace:'Arial',color:DARK,bold:true});
+      sl.addText(k[0],{x:0.6+i*3.1,y:4.65,w:2.7,h:0.18,fontSize:7.5,fontFace:'Arial',color:'475569',bold:true});
+      sl.addText(k[2],{x:0.6+i*3.1,y:4.85,w:2.7,h:0.17,fontSize:7,fontFace:'Arial',color:GRAY});
+    });
+
+    // Aging table
+    const agingRows=a.aging.map(e=>[e.label,nf.format(e.value),e.label.includes('9')?'Escalate':'Follow-up']);
+    const agingTable=pptx.addTable([['Aging','Count','Action'],...agingRows.map(r=>r.map(String))],{x:0.5,y:5.35,w:6,h:1.3,fontSize:8,fontFace:'Arial',border:{color:'CBD5E1',pt:0.5},colW:[1.8,1,2.5]});
+    agingTable.rows[0].fill={color:NAVY};agingTable.rows[0].color=WHITE;agingTable.rows[0].Bold=true;
+    sl.addTable(agingTable);
+
+    // Footer
+    sl.addShape(pptx.shapes.LINE,{x:0.5,y:6.82,w:'90%',h:0,line:{color:'CBD5E1',width:0.5}});
+    sl.addText(`Generated ${new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}`,{x:0.5,y:6.85,w:8,h:0.2,fontSize:7,fontFace:'Arial',color:LGRAY});
+    sl.addText(ds.client,{x:9,y:6.85,w:4,h:0.2,fontSize:7,fontFace:'Arial',color:NAVY,bold:true,align:'right'});
+
+    // ── Slide 3: States & Lanes ──
+    sl=pptx.addSlide();
+    sl.addText('Network & Movement',{x:0.5,y:0.15,w:8,h:0.35,fontSize:20,fontFace:'Arial',color:DARK,bold:true});
+    sl.addText('Geographic distribution and top lanes',{x:0.5,y:0.48,w:8,h:0.2,fontSize:9,fontFace:'Arial',color:GRAY});
+    sl.addShape(pptx.shapes.LINE,{x:0.5,y:0.72,w:'90%',h:0,line:{color:'E2E8F0',width:0.5}});
+
+    // State chart
+    if(a.states.length){
+      sl.addChart(pptx.charts.BAR,{
+        labels:a.states.map(e=>e.label),
+        datasets:[{name:'Shipments',data:a.states.map(e=>e.value)}]
+      },{x:0.3,y:0.85,w:5.8,h:3.2,showLegend:false,showTitle:true,title:'Top Destination States',titleFontSize:11,titleColor:DARK,chartColors:['0F766E'],barDir:'bar',barGapWidthPct:50,catAxisLabelFontSize:9,valAxisLabelFontSize:8});
+    }
+
+    // Lanes table
+    const laneRows=a.lanes.slice(0,8).map(l=>[l.label.length>35?l.label.slice(0,35)+'...':l.label,nf.format(l.value)]);
+    const laneTable=pptx.addTable([['Lane','Shipments'],...laneRows.map(r=>r.map(String))],{x:6.5,y:0.85,w:6.2,h:3.2,fontSize:8,fontFace:'Arial',border:{color:'CBD5E1',pt:0.5},colW:[4.5,1.7]});
+    laneTable.rows[0].fill={color:NAVY};laneTable.rows[0].color=WHITE;laneTable.rows[0].Bold=true;
+    sl.addTable(laneTable);
+
+    // Footer
+    sl.addShape(pptx.shapes.LINE,{x:0.5,y:6.82,w:'90%',h:0,line:{color:'CBD5E1',width:0.5}});
+    sl.addText(`Generated ${new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}`,{x:0.5,y:6.85,w:8,h:0.2,fontSize:7,fontFace:'Arial',color:LGRAY});
+    sl.addText(ds.client,{x:9,y:6.85,w:4,h:0.2,fontSize:7,fontFace:'Arial',color:NAVY,bold:true,align:'right'});
+
+    const fileName=`${safeFile(ds.client)}_MIS_Report.pptx`;
+    setProgress(80,`Saving ${ds.client}...`);
+    await pptx.writeFile({fileName});
+  }
+}
+
+// ── PDF Generation (client-side with jsPDF) ──
+async function generatePdfReports(){
+  setProgress(15,'Creating PDF...');
+  const datasets=app.datasets.map(ds=>{const r=buildSummary(ds.records);const a=buildAggregates(ds.records);return{...ds,summary:r,agg:a}});
+  if(app.datasets.length>=2){const m=getMergedRecords();datasets.push({source:'merged',client:'All Customers (Consolidated)',records:m,summary:buildSummary(m),agg:buildAggregates(m)})}
+
+  for(let i=0;i<datasets.length;i++){
+    setProgress(15+i*(60/datasets.length),`Generating ${datasets[i].client}...`);
+    const ds=datasets[i],s=ds.summary;
+    const {jsPDF}=window.jspdf;
+    const pdf=new jsPDF('p','mm','a4');
+    const W=210,M=12,pw=W-M*2;
+
+    // Header
+    pdf.setFillColor(30,58,95);pdf.rect(0,0,W,8,'F');
+    pdf.setFontSize(8);pdf.setTextColor(255,255,255);pdf.text('SONIC BUSINESS SOLUTIONS — MIS DASHBOARD',W/2,5.5,{align:'center'});
+    pdf.setFontSize(20);pdf.setTextColor(30,58,95);pdf.text('MIS Dashboard',M,22);
+    pdf.setFontSize(12);pdf.setTextColor(37,99,235);pdf.text(ds.client,M,29);
+    pdf.setFontSize(8);pdf.setTextColor(100,116,139);pdf.text(s.period||'Selected Period',M,34);
+    pdf.setDrawColor(37,99,235);pdf.setLineWidth(0.5);pdf.line(M,36,M+pw,36);
+
+    // KPIs
+    const kpis=[['Shipments',nf.format(s.shipments),'All consignments'],['Delivered',`${s.deliveredRate}%`,`${nf.format(s.delivered)} closed`],['On-Time',`${s.onTimeRate}%`,`${nf.format(s.lateDelivered)} late`],['Open Delayed',nf.format(s.delayedOpen),`${nf.format(s.open)} open`]];
+    const colors=[[235,245,255,147,197,253],[209,250,229,110,231,183],[254,243,199,252,211,77],[254,226,226,252,165,165]];
+    kpis.forEach((k,idx)=>{
+      const x=M+idx*(pw/4),w=pw/4-3;
+      pdf.setFillColor(colors[idx][0],colors[idx][1],colors[idx][2]);pdf.rect(x,40,w,16,'F');
+      pdf.setDrawColor(colors[idx][3],colors[idx][4],colors[idx][5]);pdf.rect(x,40,w,16,'S');
+      pdf.setFontSize(14);pdf.setTextColor(15,23,42);pdf.text(k[1],x+2,47);
+      pdf.setFontSize(6.5);pdf.setTextColor(71,85,105);pdf.text(k[0],x+2,51.5);
+      pdf.setFontSize(6);pdf.setTextColor(100,116,139);pdf.text(k[2],x+2,54.5);
+    });
+
+    let y=62;
+    // Insights
+    pdf.setFillColor(248,250,252);pdf.rect(M,y,pw,18,'F');pdf.setDrawColor(226,232,240);pdf.rect(M,y,pw,18,'S');
+    pdf.setFillColor(37,99,235);pdf.rect(M,y,1.5,18,'F');
+    pdf.setFontSize(9);pdf.setTextColor(15,23,42);pdf.text('Executive Summary',M+4,y+4);
+    const insights=[`${s.deliveredRate}% closure; ${nf.format(s.open)} open.`,`${s.onTimeRate}% on-time delivery.`,`${nf.format(s.delayedOpen)} past promise.`];
+    insights.forEach((ins,idx)=>{pdf.setFontSize(7.5);pdf.setTextColor(71,85,105);pdf.text(`• ${ins}`,M+4,y+8+idx*3.5)});
+    y+=22;
+
+    // Status table
+    pdf.setFontSize(10);pdf.setTextColor(30,58,95);pdf.text('Status Breakdown',M,y);y+=4;
+    const stRows=ds.agg.status.map(e=>[e.label,nf.format(e.value),`${Math.round(e.value/s.shipments*100)}%`]);
+    pdf.autoTable({startY:y,head:[['Status','Count','Share']],body:stRows,margin:{left:M,right:M},styles:{fontSize:8,cellPadding:2},headStyles:{fillColor:[30,58,95],textColor:255},alternateRowStyles:{fillColor:[248,250,252]}});
+    y=pdf.lastAutoTable.finalY+8;
+
+    // Aging table
+    pdf.setFontSize(10);pdf.setTextColor(30,58,95);pdf.text('Open Aging',M,y);y+=4;
+    const agRows=ds.agg.aging.map(e=>[e.label,nf.format(e.value),e.label.includes('9')?'Escalate':'Follow-up']);
+    pdf.autoTable({startY:y,head:[['Aging','Count','Action']],body:agRows,margin:{left:M,right:M},styles:{fontSize:8,cellPadding:2},headStyles:{fillColor:[30,58,95],textColor:255},alternateRowStyles:{fillColor:[248,250,252]}});
+    y=pdf.lastAutoTable.finalY+8;
+
+    // Lanes
+    if(ds.agg.lanes.length&&y<250){
+      pdf.setFontSize(10);pdf.setTextColor(30,58,95);pdf.text('Top Lanes',M,y);y+=4;
+      const lnRows=ds.agg.lanes.slice(0,6).map(l=>[l.label.length>50?l.label.slice(0,50)+'...':l.label,nf.format(l.value)]);
+      pdf.autoTable({startY:y,head:[['Lane','Shipments']],body:lnRows,margin:{left:M,right:M},styles:{fontSize:8,cellPadding:2},headStyles:{fillColor:[30,58,95],textColor:255},alternateRowStyles:{fillColor:[248,250,252]}});
+    }
+
+    pdf.setFontSize(7);pdf.setTextColor(148,163,184);pdf.text(`Generated ${new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})} — Sonic Business Solutions`,M,290);
+
+    const fileName=`${safeFile(ds.client)}_MIS_Report.pdf`;
+    setProgress(80,`Saving ${ds.client}...`);
+    pdf.save(fileName);
+  }
+}
+
+// ── Backend fallback for Word ──
 async function tryBackend(format){
-  if(!app.uploadedFiles.length){showToast('Reload CSV files for backend generation.');return!1}
+  if(!app.uploadedFiles.length){showToast('Reload CSV files for backend generation.');return}
+  setProgress(20,'Connecting to server...');
+  const fd=new FormData();app.uploadedFiles.forEach(f=>fd.append('files',f,f.name));fd.append('format',format);
   try{
-    setProgress(10,'Connecting to server...');
-    const fd=new FormData();app.uploadedFiles.forEach(f=>fd.append('files',f,f.name));fd.append('format',format);
-    const resp=await fetch(BACKEND_URL,{method:'POST',body:fd});
-    if(!resp.ok){showToast(`Server error: ${resp.status}`);return!1}
-    const blob=await resp.blob(),name=`Logistics_Reports_${safeFile(formatDate(new Date()))}.zip`;
-    if(dom.pptLink.dataset.url)URL.revokeObjectURL(dom.pptLink.dataset.url);
-    const url=URL.createObjectURL(blob);dom.pptLink.href=url;dom.pptLink.download=name;dom.pptLink.dataset.url=url;dom.pptLink.classList.remove('hidden');dom.pptLink.click();
-    setProgress(100,'Done!');return!0
-  }catch(e){return!1}
+    const resp=await fetch(window.location.origin+'/api/generate',{method:'POST',body:fd});
+    if(!resp.ok){showToast(`Server error: ${resp.status}`);return}
+    const blob=await resp.blob(),name=`MIS_Reports_${safeFile(formatDate(new Date()))}.zip`;
+    const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;a.click();URL.revokeObjectURL(url);
+    setProgress(100,'Done!');
+  }catch(e){showToast('Backend unavailable. Only PPT and PDF can be generated locally.')}
 }
 
-function setProgress(p,l){dom.progressFill.style.width=`${Math.min(100,Math.max(0,p))}%`;if(l)dom.progressLabel.textContent=l}
-function setupC(c){const r=c.getBoundingClientRect(),dpr=Math.max(1,Math.min(2,window.devicePixelRatio||1)),w=Math.max(320,Math.floor(r.width||420)),h=Math.max(210,Math.floor(r.height||250));c.width=Math.round(w*dpr);c.height=Math.round(h*dpr);const ctx=c.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);ctx.textBaseline='middle';return{ctx,width:w,height:h}}
+function showProgress(p,l){dom.progressOverlay.classList.remove('hidden');dom.progressFill.style.width=`${Math.min(100,Math.max(0,p))}%`;if(l)dom.progressLabel.textContent=l}
+function setProgress(p,l){showProgress(p,l)}
 
-function drawDonut(c,entries,palette){
-  const ch=setupC(c),data=entries.filter(e=>e.value>0),total=sum(data,e=>e.value);if(!total)return drawEmpty(ch,'No data');
-  const{ctx,width,height}=ch,compact=width<440,cx=compact?width/2:96,cy=compact?92:height/2,radius=Math.min(74,height*.31);let start=-Math.PI/2;
-  data.forEach((e,i)=>{const a=e.value/total*Math.PI*2;ctx.beginPath();ctx.strokeStyle=palette[i%palette.length];ctx.lineWidth=25;ctx.arc(cx,cy,radius,start,start+a);ctx.stroke();start+=a});
-  ctx.fillStyle=COLORS.ink;ctx.textAlign='center';ctx.font='800 25px Inter, system-ui, sans-serif';ctx.fillText(nf.format(total),cx,cy-5);
-  ctx.fillStyle=COLORS.gray;ctx.font='11px Inter, system-ui, sans-serif';ctx.fillText('shipments',cx,cy+20);
-  const lx=compact?24:205,ly=compact?178:55;data.slice(0,6).forEach((e,i)=>{const y=ly+i*25;ctx.fillStyle=palette[i%palette.length];ctx.fillRect(lx,y-5,10,10);ctx.fillStyle=COLORS.ink;ctx.textAlign='left';ctx.font='12px Inter, system-ui, sans-serif';ctx.fillText(trunc(e.label,compact?18:24),lx+16,y);ctx.fillStyle=COLORS.gray;ctx.textAlign='right';ctx.fillText(nf.format(e.value),width-18,y)})
-}
-
-function drawLine(c,series,color){
-  const ch=setupC(c),data=series.slice(-22);if(!data.length)return drawEmpty(ch,'No data');
-  const{ctx,width,height}=ch,m={top:22,right:16,bottom:36,left:36},w=width-m.left-m.right,h=height-m.top-m.bottom,max=Math.max(1,...data.map(p=>p.value));
-  ctx.strokeStyle='#E2E8F0';for(let i=0;i<=4;i++){const y=m.top+h/4*i;ctx.beginPath();ctx.moveTo(m.left,y);ctx.lineTo(width-m.right,y);ctx.stroke()}
-  const pts=data.map((p,i)=>({x:m.left+(data.length===1?w/2:w/(data.length-1)*i),y:m.top+h-p.value/max*h,p}));
-  ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.strokeStyle=color;ctx.lineWidth=3;ctx.stroke();
-  pts.forEach(p=>{ctx.beginPath();ctx.fillStyle='#fff';ctx.strokeStyle=color;ctx.lineWidth=2;ctx.arc(p.x,p.y,4,0,Math.PI*2);ctx.fill();ctx.stroke()});
-  ctx.fillStyle=COLORS.gray;ctx.font='10px Inter, system-ui, sans-serif';ctx.textAlign='center';const every=Math.max(1,Math.ceil(data.length/6));pts.forEach((p,i)=>{if(i%every===0||i===pts.length-1)ctx.fillText(p.p.label,p.x,height-16)})
-}
-
-function drawHorizontalBars(c,entries,color){
-  const ch=setupC(c),data=entries.slice(0,8).filter(e=>e.value>0);if(!data.length)return drawEmpty(ch,'No data');
-  const{ctx,width,height}=ch,max=Math.max(1,...data.map(e=>e.value)),left=Math.min(138,width*.36),rowH=Math.min(26,(height-34)/data.length);
-  data.forEach((e,i)=>{const y=22+i*rowH,barW=(width-left-42)*e.value/max;ctx.fillStyle=COLORS.ink;ctx.font='11px Inter, system-ui, sans-serif';ctx.textAlign='right';ctx.fillText(trunc(e.label,18),left-10,y+rowH/2);ctx.fillStyle='#EAF2F8';ctx.fillRect(left,y+5,width-left-42,rowH-10);ctx.fillStyle=color;ctx.fillRect(left,y+5,barW,rowH-10);ctx.fillStyle=COLORS.gray;ctx.textAlign='left';ctx.fillText(nf.format(e.value),left+barW+7,y+rowH/2)})
-}
-
-function drawVerticalBars(c,entries,color){
-  const ch=setupC(c),total=sum(entries,e=>e.value);if(!total)return drawEmpty(ch,'No open');
-  const{ctx,width,height}=ch,m={top:24,right:20,bottom:42,left:38},w=width-m.left-m.right,h=height-m.top-m.bottom,max=Math.max(1,...entries.map(e=>e.value)),gap=16,barW=(w-gap*(entries.length-1))/entries.length;
-  ctx.strokeStyle='#E2E8F0';for(let i=0;i<=4;i++){const y=m.top+h/4*i;ctx.beginPath();ctx.moveTo(m.left,y);ctx.lineTo(width-m.right,y);ctx.stroke()}
-  entries.forEach((e,i)=>{const x=m.left+i*(barW+gap),barH=e.value/max*h,y=m.top+h-barH;ctx.fillStyle='#FEF3C7';ctx.fillRect(x,m.top,barW,h);ctx.fillStyle=color;ctx.fillRect(x,y,barW,barH);ctx.fillStyle=COLORS.ink;ctx.textAlign='center';ctx.font='800 13px Inter, system-ui, sans-serif';ctx.fillText(nf.format(e.value),x+barW/2,y-10);ctx.fillStyle=COLORS.gray;ctx.font='11px Inter, system-ui, sans-serif';ctx.fillText(e.label,x+barW/2,height-18)})
-}
-
-function drawEmpty(ch,label){const{ctx,width,height}=ch;ctx.fillStyle='#F8FAFC';ctx.fillRect(0,0,width,height);ctx.strokeStyle='#DDE7F0';ctx.strokeRect(.5,.5,width-1,height-1);ctx.fillStyle=COLORS.gray;ctx.textAlign='center';ctx.font='12px Inter, system-ui, sans-serif';ctx.fillText(label,width/2,height/2)}
-function resetFilters(){app.filters={period:'all',warehouse:'all',state:'all',status:'all'};dom.periodFilter.value='all';dom.warehouseFilter.value='all';dom.stateFilter.value='all';dom.statusFilter.value='all';applyFilters()}
-function countBy(r,g){const m=new Map();r.forEach(r=>{const k=g(r)||'Unknown';m.set(k,(m.get(k)||0)+1)});return m}
-function top(m,l){return Array.from(m.entries()).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])).slice(0,l).map(([l,v])=>({label:l,value:v}))}
+// ── CSV Parsing ──
+function guessState(c){const m={bengaluru:'Karnataka',bangalore:'Karnataka',mumbai:'Maharashtra',pune:'Maharashtra',nagpur:'Maharashtra',thane:'Maharashtra',delhi:'Delhi','new delhi':'Delhi',hyderabad:'Telangana',chennai:'Tamil Nadu',kolkata:'West Bengal',ahmedabad:'Gujarat',jaipur:'Rajasthan',lucknow:'Uttar Pradesh',chandigarh:'Chandigarh'};(c||'').toLowerCase();for(const[k,v]of Object.entries(m))if((c||'').toLowerCase().includes(k))return v;return c||'Unknown'}
+function parseCsv(text){const clean=String(text||'').replace(/^\uFEFF/,'');const rows=[];let row=[],val='',q=false;for(let i=0;i<clean.length;i++){const c=clean[i],n=clean[i+1];if(q){if(c==='"'&&n==='"'){val+='"';i++}else if(c==='"')q=false;else val+=c}else if(c==='"')q=true;else if(c===','){row.push(val);val=''}else if(c==='\n'){row.push(val);rows.push(row);row=[];val=''}else if(c!=='\r')val+=c}if(val.length||row.length){row.push(val);rows.push(row)}const header=(rows.shift()||[]).map(cleanCell);return rows.filter(r=>r.some(c=>cleanCell(c))).map(r=>{const o={};header.forEach((h,i)=>{o[h]=cleanCell(r[i]||'')});return o})}
 function cleanCell(v){return String(v==null?'':v).replace(/^`/,'').trim()}
 function isDelivered(v){const t=cleanCell(v).toLowerCase();return t==='delivered'||t==='delivered to consignee'}
 function parseNum(v){const n=Number(String(v==null?'':v).replace(/[,`]/g,'').trim());return Number.isFinite(n)?n:0}
 function parseDate(v){const c=cleanCell(v);if(!c)return null;const m=c.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?)?/);if(m)return new Date(Number(m[1]),Number(m[2])-1,Number(m[3]||0),Number(m[4]||0),Number(m[5]||0),Number(m[6]||0),Number((m[7]||'0').slice(0,3)));const p=new Date(c);return Number.isNaN(p.getTime())?null:p}
 function getAsof(r){const d=[];r.forEach(r=>[r.lastScanDate,r.deliveredDate,r.pickupDate,r.manifestDate].forEach(dt=>dt&&d.push(dt)));return d.length?new Date(Math.max(...d.map(d=>d.getTime()))):new Date()}
-function dateRangeLabel(r){const d=r.map(r=>r.manifestDate||r.pickupDate||r.deliveredDate).filter(Boolean).sort((a,b)=>a-b);if(!d.length)return'';return d[0].toDateString()===d[d.length-1].toDateString()?formatDate(d[0]):`${formatDate(d[0])} to ${formatDate(d[d.length-1])}`}
-function titleCase(v){return String(v||'').toLowerCase().replace(/\b[a-z]/g,c=>c.toUpperCase())}
+function countBy(r,g){const m=new Map();r.forEach(r=>{const k=g(r)||'Unknown';m.set(k,(m.get(k)||0)+1)});return m}
+function top(m,l){return Array.from(m.entries()).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])).slice(0,l).map(([l,v])=>({label:l,value:v}))}
 function sum(i,g){return i.reduce((t,i)=>t+Number(g(i)||0),0)}
 function diffDays(s,e){return s&&e?Math.max(0,(e.getTime()-s.getTime())/DAY):0}
 function startOf(d){return new Date(d.getFullYear(),d.getMonth(),d.getDate())}

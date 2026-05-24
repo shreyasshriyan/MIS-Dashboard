@@ -445,9 +445,9 @@ def generate_ppt(report):
     # ── Slide 1: Cover ──
     sl = prs.slides.add_slide(prs.slide_layouts[6])
     rect(sl, 0, 0, sw, Inches(0.55), NAVY)
-    txt(sl, Inches(0.5), Inches(0.08), Inches(12.3), Inches(0.4), 'MONTHLY LOGISTICS REPORT', 10, True, WHITE)
+    txt(sl, Inches(0.5), Inches(0.08), Inches(12.3), Inches(0.4), 'SONIC BUSINESS SOLUTIONS', 10, True, WHITE)
     rect(sl, M, Inches(1.0), Inches(12.1), Inches(0.03), BLUE)
-    txt(sl, M, Inches(1.28), Inches(8.5), Inches(0.55), 'Logistics Performance Report', 28, True, DARK)
+    txt(sl, M, Inches(1.28), Inches(8.5), Inches(0.55), 'MIS Dashboard', 28, True, DARK)
     txt(sl, M+Inches(0.02), Inches(1.9), Inches(7.5), Inches(0.32), report['client'], 16, True, NAVY)
     txt(sl, M+Inches(0.02), Inches(2.28), Inches(7.5), Inches(0.25), report['period'], 11, False, GRAY)
     rect(sl, M, Inches(2.75), Inches(12.1), Inches(0.02), RGBColor(0xCB,0xD5,0xE1))
@@ -576,7 +576,7 @@ def generate_docx(report):
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER if level == 0 else WD_ALIGN_PARAGRAPH.LEFT
         for r in p.runs: r.font.color.rgb = DocRGB(*bytes.fromhex(color))
 
-    add_heading('LOGISTICS PERFORMANCE REPORT', 0)
+    add_heading('MIS DASHBOARD — SONIC BUSINESS SOLUTIONS', 0)
     p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     r = p.add_run(report['client']); r.bold = True; r.font.size = DocPt(16); r.font.color.rgb = DocRGB(0x25,0x63,0xEB)
     p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -640,7 +640,7 @@ class LogisticsPDF(FPDF):
     def header(self):
         self.set_font('Helvetica', 'B', 8)
         self.set_text_color(0x1E, 0x3A, 0x5F)
-        self.cell(0, 6, 'LOGISTICS PERFORMANCE REPORT', align='C'); self.ln(8)
+        self.cell(0, 6, 'SONIC BUSINESS SOLUTIONS — MIS DASHBOARD', align='C'); self.ln(8)
         self.set_draw_color(0x25, 0x63, 0xEB); self.set_line_width(0.5)
         self.line(10, self.get_y(), 200, self.get_y()); self.ln(4)
     def footer(self):
@@ -685,7 +685,7 @@ class LogisticsPDF(FPDF):
 def generate_pdf(report):
     pdf = LogisticsPDF(); pdf.alias_nb_pages(); pdf.set_auto_page_break(auto=True, margin=20); pdf.add_page()
     pdf.set_font('Helvetica', 'B', 20); pdf.set_text_color(0x1E,0x3A,0x5F)
-    pdf.cell(0, 10, 'LOGISTICS PERFORMANCE REPORT', align='C'); pdf.ln(12)
+    pdf.cell(0, 10, 'MIS Dashboard', align='C'); pdf.ln(12)
     pdf.set_font('Helvetica', 'B', 12); pdf.set_text_color(0x25,0x63,0xEB)
     pdf.cell(0, 7, report['client'], align='C'); pdf.ln(7)
     pdf.set_font('Helvetica', '', 8); pdf.set_text_color(0x64,0x74,0x8B)
