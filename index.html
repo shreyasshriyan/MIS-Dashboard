@@ -510,8 +510,8 @@ async function createReports(format){
     if(format==='ppt'){await generatePptx();setProgress(100,'Done!')}
     else if(format==='pdf'){await generatePdfReports();setProgress(100,'Done!')}
     else{await tryBackend(format)}
-  }catch(e){showToast(e.message||'Could not create reports.')}
-  finally{btn.disabled=false;setTimeout(()=>dom.progressOverlay.classList.add('hidden'),1200)}
+  }catch(e){console.error(e);showToast('Error: '+(e.message||String(e)))}
+  finally{btn.disabled=false;if(typeof dom==='object'&&dom.progressOverlay)setTimeout(()=>dom.progressOverlay.classList.add('hidden'),1200)}
 }
 
 // ── PPT Generation (Client-side with pptxgenjs) ──
@@ -531,10 +531,10 @@ async function generatePptx(){
     pptx.author='Sonic Business Solutions';pptx.subject='MIS Dashboard Report';
 
     const genDate=new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
-    const footer=sl=>{sl.addShape(pptx.shapes.LINE,{x:0.5,y:6.82,w:'90%',h:0,line:{color:BORDER,width:0.5}});sl.addText(`Generated ${genDate}`,{x:0.5,y:6.85,w:8,h:0.2,fontSize:7,fontFace:'Arial',color:LGRAY});sl.addText(ds.client,{x:9,y:6.85,w:4,h:0.2,fontSize:7,fontFace:'Arial',color:NAVY,bold:true,align:'right'})};
+    const footer=sl=>{sl.addShape('line',{x:0.5,y:6.82,w:'90%',h:0,line:{color:BORDER,width:0.5}});sl.addText(`Generated ${genDate}`,{x:0.5,y:6.85,w:8,h:0.2,fontSize:7,fontFace:'Arial',color:LGRAY});sl.addText(ds.client,{x:9,y:6.85,w:4,h:0.2,fontSize:7,fontFace:'Arial',color:NAVY,bold:true,align:'right'})};
     const kpiRow=(sl,kpis,y)=>{
       kpis.forEach((k,i)=>{const x=0.5+i*3.1;
-        sl.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x,y,w:2.9,h:0.85,fill:{color:ACCENT[i%4]},rectRadius:0.08});
+        sl.addShape('roundRect',{x,y,w:2.9,h:0.85,fill:{color:ACCENT[i%4]},rectRadius:0.08});
         sl.addText(k[1],{x:x+0.1,y:y+0.05,w:2.7,h:0.3,fontSize:16,fontFace:'Arial',color:DARK,bold:true});
         sl.addText(k[0],{x:x+0.1,y:y+0.4,w:2.7,h:0.18,fontSize:7.5,fontFace:'Arial',color:'475569',bold:true});
         sl.addText(k[2],{x:x+0.1,y:y+0.6,w:2.7,h:0.17,fontSize:7,fontFace:'Arial',color:GRAY})})
@@ -543,14 +543,14 @@ async function generatePptx(){
     // ── Slide 1: Cover ──
     let sl=pptx.addSlide();
     sl.addText('SONIC BUSINESS SOLUTIONS',{x:0,y:0,w:'100%',h:0.45,fontSize:10,fontFace:'Arial',color:WHITE,bold:true,fill:{color:NAVY},align:'center',valign:'middle'});
-    sl.addShape(pptx.shapes.LINE,{x:0.5,y:0.7,w:'90%',h:0,line:{color:BLUE,width:2}});
+    sl.addShape('line',{x:0.5,y:0.7,w:'90%',h:0,line:{color:BLUE,width:2}});
     sl.addText('MIS Dashboard',{x:0.5,y:0.95,w:8,h:0.5,fontSize:28,fontFace:'Arial',color:DARK,bold:true});
     sl.addText(ds.client,{x:0.52,y:1.5,w:7,h:0.3,fontSize:16,fontFace:'Arial',color:NAVY,bold:true});
     kpiRow(sl,[['Total Shipments',nf.format(s.shipments),'All consignments'],['Delivered',`${s.deliveredRate}%`,`${nf.format(s.delivered)} closed`],['On-Time Rate',`${s.onTimeRate}%`,`${nf.format(s.lateDelivered)} late`],['Open Delayed',nf.format(s.delayedOpen),`${nf.format(s.open)} open`]],2.3);
     // Insights
     const inss=[`${s.deliveredRate}% closure across ${nf.format(s.shipments)} shipments; ${nf.format(s.open)} remain open.`,`${s.onTimeRate}% on-time delivery; ${nf.format(s.lateDelivered)} late delivered.`,`${nf.format(s.delayedOpen)} open past promise — require ETA updates.`,a.states.length?`${a.states[0].label} is top destination state.`:'',a.lanes.length?`Top lane: ${a.lanes[0].label}.`:''].filter(Boolean);
-    sl.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:0.5,y:3.65,w:'90%',h:1.8,fill:{color:'F8FAFC'},line:{color:'E2E8F0',width:0.5},rectRadius:0.1});
-    sl.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:0.5,y:3.65,w:0.05,h:1.8,fill:{color:BLUE}});
+    sl.addShape('roundRect',{x:0.5,y:3.65,w:'90%',h:1.8,fill:{color:'F8FAFC'},line:{color:'E2E8F0',width:0.5},rectRadius:0.1});
+    sl.addShape('roundRect',{x:0.5,y:3.65,w:0.05,h:1.8,fill:{color:BLUE}});
     sl.addText('Executive Summary',{x:0.75,y:3.75,w:4,h:0.22,fontSize:9.5,fontFace:'Arial',color:DARK,bold:true});
     inss.forEach((ins,j)=>{sl.addText(`• ${ins}`,{x:0.75,y:4.05+j*0.22,w:11,h:0.22,fontSize:8,fontFace:'Arial',color:'334155'})});
     // Status table on cover
@@ -563,7 +563,7 @@ async function generatePptx(){
     // ── Slide 2: Performance ──
     sl=pptx.addSlide();
     sl.addText('Performance Overview',{x:0.5,y:0.15,w:8,h:0.35,fontSize:20,fontFace:'Arial',color:DARK,bold:true});
-    sl.addShape(pptx.shapes.LINE,{x:0.5,y:0.55,w:'90%',h:0,line:{color:'E2E8F0',width:0.5}});
+    sl.addShape('line',{x:0.5,y:0.55,w:'90%',h:0,line:{color:'E2E8F0',width:0.5}});
     kpiRow(sl,[['Package Value',s.valueLabel,'Declared value'],['Total Boxes',nf.format(s.boxes),s.weightLabel],['Avg TAT',s.avgTatLabel,'Pickup to delivery'],['Attempted',nf.format(s.attempted),'Total attempts']],0.75);
     // Aging table
     sl.addText('Open Shipment Aging',{x:0.5,y:1.9,w:5,h:0.25,fontSize:11,fontFace:'Arial',color:NAVY,bold:true});
