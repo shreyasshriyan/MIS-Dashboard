@@ -83,11 +83,11 @@ th{position:sticky;top:0;background:#eef5fb;color:#334155;font-size:11px;text-tr
   </div>
 </header>
 <div class="upload-row">
-  <label class="drop-zone" id="dropZone" for="csvInput">
+  <div class="drop-zone" id="dropZone">
     <span class="drop-icon"><i data-lucide="upload-cloud"></i></span>
-    <span><strong>Drop CSV files or browse</strong><span>Upload multiple CSV files — supports sonic_b2b and Customer MIS formats.</span></span>
-    <input class="hidden" id="csvInput" type="file" accept=".csv,text/csv" multiple>
-  </label>
+    <span><strong>Drop CSV files or click to browse</strong><span>Upload multiple CSV files — supports sonic_b2b and Customer MIS formats.</span></span>
+    <input class="hidden" id="csvInput" type="file" accept=".csv" multiple>
+  </div>
   <div class="filters">
     <div><label class="filter-label" for="periodFilter">Period</label><select id="periodFilter"></select></div>
     <div><label class="filter-label" for="warehouseFilter">Warehouse</label><select id="warehouseFilter"></select></div>
@@ -148,6 +148,7 @@ document.addEventListener('DOMContentLoaded',init);
 function init(){bindEvents();setBaseFilterOptions();drawEmptyCharts();createIcons()}
 
 function bindEvents(){
+  dom.dropZone.addEventListener('click',()=>dom.csvInput.click());
   dom.csvInput.addEventListener('change',e=>{const f=Array.from(e.target.files||[]);if(f.length)readFiles(f);e.target.value=''});
   ['dragenter','dragover'].forEach(t=>dom.dropZone.addEventListener(t,e=>{e.preventDefault();dom.dropZone.classList.add('dragging')}));
   ['dragleave','drop'].forEach(t=>dom.dropZone.addEventListener(t,e=>{e.preventDefault();dom.dropZone.classList.remove('dragging')}));
@@ -165,23 +166,24 @@ function detectSchema(header){for(const[k,p]of Object.entries(SCHEMAS))if(p.dete
 
 function readFiles(files){
   const csv=files.filter(f=>f.name.endsWith('.csv')||f.type==='text/csv');
-  if(!csv.length){showToast('No CSV files found.');return}
+  if(!csv.length){showToast('No CSV files found. Please select .csv files.');return}
   app.uploadedFiles=csv;let done=0,total=csv.length,loaded=0;
   csv.forEach(f=>{
     const r=new FileReader();
-    r.onload=()=>{const ds=loadCsv(r.result||'',f.name);if(ds)loaded++;done++;if(done>=total){renderDatasetsBar();if(app.activeIndex<0&&app.datasets.length)switchToDataset(app.datasets.length-1);showToast(`Loaded ${nf.format(total)} file(s).`)}};
-    r.onerror=()=>{showToast(`Could not read ${f.name}`);done++};
+    r.onload=()=>{const ds=loadCsv(r.result||'',f.name);if(ds)loaded++;done++;if(done>=total){renderDatasetsBar();if(app.activeIndex<0&&app.datasets.length)switchToDataset(app.datasets.length-1);showToast(`Loaded ${nf.format(loaded)} file(s).`)}};
+    r.onerror=()=>{showToast(`Error reading ${f.name}`);done++};
     r.readAsText(f)
   })
 }
 
 async function loadSample(announce){
   try{
-    const res=await fetch('sonic_b2b.csv',{cache:'no-store'});
+    const res=await fetch('./sonic_b2b.csv',{cache:'no-store'});
     if(!res.ok)throw Error();
     const text=await res.text(),ds=loadCsv(text,'sonic_b2b.csv');
     if(ds){renderDatasetsBar();switchToDataset(app.datasets.indexOf(ds));if(announce)showToast('Loaded sample.')}
-  }catch(e){if(announce)showToast('Sample CSV not found.')}
+    else if(announce)showToast('Sample CSV has no data.')
+  }catch(e){if(announce)showToast('Sample CSV not found. Try uploading your own file.')}
 }
 
 function loadCsv(text,source){
