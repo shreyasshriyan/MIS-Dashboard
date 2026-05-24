@@ -557,7 +557,7 @@ async function generatePptx(){
     const sr=[['Status','Count','Share']];
     a.status.forEach(e=>sr.push([e.label,nf.format(e.value),`${Math.round(e.value/s.shipments*100)}%`]));
     const stTbl=[{rows:sr,options:{x:0.55,y:5.6,w:5.5,fontSize:7,fontFace:'Arial',border:{color:BORDER,pt:0.5},colW:[2,1.2,1.5],rowH:0.28}}];
-    stTbl.forEach(t=>{const tbl=pptx.addTable(t.rows,t.options);tbl.rows[0].fill={color:NAVY};tbl.rows[0].color=WHITE;tbl.rows[0].bold=true;sl.addTable(tbl)});
+    stTbl.forEach(t=>{const tbl=sl.addTable(t.rows,t.options);tbl.rows[0].fill={color:NAVY};tbl.rows[0].color=WHITE;tbl.rows[0].bold=true});
     footer(sl);
 
     // ── Slide 2: Performance ──
@@ -569,18 +569,18 @@ async function generatePptx(){
     sl.addText('Open Shipment Aging',{x:0.5,y:1.9,w:5,h:0.25,fontSize:11,fontFace:'Arial',color:NAVY,bold:true});
     const ar=[['Aging','Count','Action']];
     a.aging.forEach(e=>ar.push([e.label,nf.format(e.value),e.label.includes('9')?'Escalate':'Follow-up']));
-    let _t=pptx.addTable(ar,{x:0.5,y:2.15,w:6,fontSize:8,fontFace:'Arial',border:{color:BORDER,pt:0.5},colW:[1.8,1.2,2],rowH:0.32});_t.rows[0].fill={color:NAVY};_t.rows[0].color=WHITE;_t.rows[0].bold=true;sl.addTable(_t);
+    let _t=sl.addTable(ar,{x:0.5,y:2.15,w:6,fontSize:8,fontFace:'Arial',border:{color:BORDER,pt:0.5},colW:[1.8,1.2,2],rowH:0.32});_t.rows[0].fill={color:NAVY};_t.rows[0].color=WHITE;_t.rows[0].bold=true;
     // Top lanes table
     sl.addText('Top Lanes',{x:7,y:1.9,w:5,h:0.25,fontSize:11,fontFace:'Arial',color:NAVY,bold:true});
     const lr=[['Lane','Shipments']];
     a.lanes.slice(0,8).forEach(l=>lr.push([l.label.length>35?l.label.slice(0,35)+'...':l.label,nf.format(l.value)]));
-    _t=pptx.addTable(lr,{x:7,y:2.15,w:6,fontSize:8,fontFace:'Arial',border:{color:BORDER,pt:0.5},colW:[3.5,1.2],rowH:0.32});_t.rows[0].fill={color:NAVY};_t.rows[0].color=WHITE;_t.rows[0].bold=true;sl.addTable(_t);
+    _t=sl.addTable(lr,{x:7,y:2.15,w:6,fontSize:8,fontFace:'Arial',border:{color:BORDER,pt:0.5},colW:[3.5,1.2],rowH:0.32});_t.rows[0].fill={color:NAVY};_t.rows[0].color=WHITE;_t.rows[0].bold=true;
     // Priority exceptions
     sl.addText('Priority Exceptions',{x:0.5,y:4.9,w:5,h:0.25,fontSize:11,fontFace:'Arial',color:'991B1B',bold:true});
     const now=new Date();
     const er=[['Order','Destination','Status','Promise','Amount']];
     priorityRecords(ds.records).slice(0,6).forEach(r=>{const d=!r.isDelivered&&r.promiseDate&&r.promiseDate<now;er.push([r.id.slice(0,22),`${r.destination}, ${r.state}`.slice(0,26),d?'Delayed':(r.isDelivered?'Delivered':'Open'),formatDate(r.promiseDate),fmtMoney(r.amount)])});
-    _t=pptx.addTable(er,{x:0.5,y:5.2,w:'90%',fontSize:7,fontFace:'Arial',border:{color:BORDER,pt:0.5},colW:[2.2,2.5,1.3,1.5,2],rowH:0.28});_t.rows[0].fill={color:'991B1B'};_t.rows[0].color=WHITE;_t.rows[0].bold=true;sl.addTable(_t);
+    _t=sl.addTable(er,{x:0.5,y:5.2,w:'90%',fontSize:7,fontFace:'Arial',border:{color:BORDER,pt:0.5},colW:[2.2,2.5,1.3,1.5,2],rowH:0.28});_t.rows[0].fill={color:'991B1B'};_t.rows[0].color=WHITE;_t.rows[0].bold=true;
     footer(sl);
 
     const fileName=`${safeFile(ds.client)}_MIS_Report.pptx`;
