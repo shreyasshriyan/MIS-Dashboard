@@ -288,12 +288,11 @@ const sdf=new Intl.DateTimeFormat('en-IN',{day:'2-digit',month:'short'});
 const DAY=864e5;
 let charts={};
 
-document.addEventListener('DOMContentLoaded',init);
-
 function init(){bindEvents();setBaseFilterOptions();createIcons()}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 
 function bindEvents(){
-  dom.dropZone.addEventListener('click',()=>dom.csvInput.click());
+  // Label for="csvInput" handles click natively — no JS click needed
   dom.csvInput.addEventListener('change',e=>{const f=Array.from(e.target.files||[]);if(f.length)readFiles(f);e.target.value=''});
   ['dragenter','dragover'].forEach(t=>dom.dropZone.addEventListener(t,e=>{e.preventDefault();dom.dropZone.classList.add('dragging')}));
   ['dragleave','drop'].forEach(t=>dom.dropZone.addEventListener(t,e=>{e.preventDefault();dom.dropZone.classList.remove('dragging')}));
@@ -402,13 +401,16 @@ function render(){
   $('tatMetric').textContent=s.avgTatLabel;$('tatSub').textContent=`${s.onTimeRate}% on-time`;
   $('statusNote').textContent=`${nf.format(s.open)} open`;$('agingNote').textContent=`Aging as of ${formatDate(app.asOf)}`;
   $('priorityNote').textContent=`${nf.format(s.delayedOpen)} delayed`;
-  renderCharts(a);renderLanes(a.lanes);renderPriority(app.filtered);createIcons()
+  try{renderCharts(a)}catch(e){}
+  renderLanes(a.lanes);renderPriority(app.filtered);createIcons()
 }
 
 function renderCharts(a){
   // Destroy existing charts
-  Object.values(charts).forEach(c=>{if(c)c.destroy()});
+  Object.values(charts).forEach(c=>{if(c&&c.destroy)c.destroy()});
   charts={};
+
+  if(typeof Chart==='undefined')return;
 
   // Status Donut
   const statusData=a.status.filter(e=>e.value>0);
@@ -514,6 +516,7 @@ async function createReports(format){
 
 // ── PPT Generation (Client-side with pptxgenjs) ──
 async function generatePptx(){
+  if(typeof PptxGenJS==='undefined'){showToast('PPT library unavailable. Check your internet connection for CDN.');throw new Error('PptxGenJS not loaded')}
   setProgress(20,'Creating PPT...');
   const datasets=app.datasets.map(ds=>{const r=buildSummary(ds.records);const a=buildAggregates(ds.records);return{...ds,summary:r,agg:a}});
   if(app.datasets.length>=2){const m=getMergedRecords();datasets.push({source:'merged',client:'All Customers (Consolidated)',records:m,summary:buildSummary(m),agg:buildAggregates(m)})}
@@ -644,6 +647,7 @@ async function generatePptx(){
 
 // ── PDF Generation (client-side with jsPDF) ──
 async function generatePdfReports(){
+  if(typeof window.jspdf==='undefined'){showToast('PDF library unavailable. Check your internet connection for CDN.');throw new Error('jsPDF not loaded')}
   setProgress(15,'Creating PDF...');
   const datasets=app.datasets.map(ds=>{const r=buildSummary(ds.records);const a=buildAggregates(ds.records);return{...ds,summary:r,agg:a}});
   if(app.datasets.length>=2){const m=getMergedRecords();datasets.push({source:'merged',client:'All Customers (Consolidated)',records:m,summary:buildSummary(m),agg:buildAggregates(m)})}
