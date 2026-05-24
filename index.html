@@ -516,7 +516,7 @@ async function createReports(format){
 
 // ── PPT Generation (Client-side with pptxgenjs) ──
 async function generatePptx(){
-  if(typeof PptxGenJS==='undefined'){showToast('PPT library unavailable. Check your internet connection for CDN.');throw new Error('PptxGenJS not loaded')}
+  if(typeof window.PptxGenJS!=='function'){showToast('PPT library unavailable (network/CDN issue). Try again later.');throw new Error('PptxGenJS not loaded')}
   setProgress(20,'Creating PPT...');
   const datasets=app.datasets.map(ds=>{const r=buildSummary(ds.records);const a=buildAggregates(ds.records);return{...ds,summary:r,agg:a}});
   if(app.datasets.length>=2){const m=getMergedRecords();datasets.push({source:'merged',client:'All Customers (Consolidated)',records:m,summary:buildSummary(m),agg:buildAggregates(m)})}
@@ -525,6 +525,7 @@ async function generatePptx(){
   const ACCENT=['EBF5FF','D1FAE5','FEF3C7','FEE2E2'];
 
   for(let i=0;i<datasets.length;i++){
+    try{
     setProgress(20+i*(60/datasets.length),`Generating ${datasets[i].client}...`);
     const ds=datasets[i],s=ds.summary,a=ds.agg;
     const pptx=new PptxGenJS();pptx.layout='LAYOUT_WIDE';
@@ -586,6 +587,7 @@ async function generatePptx(){
     const fileName=`${safeFile(ds.client)}_MIS_Report.pptx`;
     setProgress(80,`Saving ${ds.client}...`);
     await pptx.writeFile({fileName});
+    }catch(e){showToast('PPT error for '+datasets[i].client+': '+(e.message||String(e)));continue}
   }
 }
 
@@ -697,7 +699,8 @@ function trunc(v,l){const t=String(v||'');return t.length<=l?t:`${t.slice(0,Math
 function safeFile(v){return String(v||'Report').replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,'_').slice(0,70)}
 function esc(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function debounce(fn,w){let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn.apply(null,a),w)}}
-function showToast(m){dom.toast.textContent=m;dom.toast.classList.add('show');clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>dom.toast.classList.remove('show'),3200)}
+function showToast(m){dom.toast.textContent=m;dom.toast.classList.add('show');clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>dom.toast.classList.remove('show'),4000)}
+window.onerror=function(m,src,line,col,err){try{dom.toast.textContent='JS Error: '+(m||'Unknown');dom.toast.classList.add('show')}catch(e){};return false};
 function createIcons(){if(window.lucide&&typeof lucide.createIcons==='function')lucide.createIcons()}
 </script>
 </body>
