@@ -1,15 +1,15 @@
 # Logistics Dashboard
 
 Multi-customer logistics dashboard with automated PPT, Word, and PDF report generation.
-Supports **sonic_b2b** and **Customer MIS** CSV formats.
+Password-protected via HTTP Basic Auth. Perfect for private company use.
 
 ---
 
-## 🚀 Quick Deploy on Streamlit Cloud (FREE — with password auth)
+## 🚀 Deploy on Render (FREE — 5 min setup)
 
 ### 1. Push to GitHub
 ```bash
-# Create a private GitHub repo, then:
+# Create a NEW private repo on GitHub (don't add any files)
 cd logistics-dashboard
 git init
 git add .
@@ -18,99 +18,83 @@ git remote add origin https://github.com/YOUR-ORG/logistics-dashboard.git
 git push -u origin main
 ```
 
-### 2. Deploy on Streamlit Community Cloud
-1. Go to https://share.streamlit.io
-2. Sign in with GitHub
-3. Click **"New app"** → select your private repo
-4. Set:
-   - **Repository**: `YOUR-ORG/logistics-dashboard`
-   - **Branch**: `main`
-   - **Main file**: `streamlit_app.py`
-5. Click **Deploy**
+### 2. Deploy on Render
+1. Go to https://dashboard.render.com
+2. Click **"New +"** → **"Web Service"**
+3. Connect your GitHub account and select the private repo
+4. Fill in:
+   - **Name**: `logistics-dashboard`
+   - **Runtime**: `Python 3`
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120`
+5. Click **"Advanced"** → **"Add Environment Variable"**
+   - `RENDER_USERNAME` = `admin` (or your preferred username)
+   - `RENDER_PASSWORD` = `your-strong-password`
+6. Select **"Free"** plan
+7. Click **"Deploy Web Service"**
 
-### 3. Set password (Secrets)
-1. After deploy, go to https://share.streamlit.io — find your app
-2. Click **"⚙️ Settings"** → **"Secrets"**
-3. Paste:
-   ```toml
-   [auth]
-   username = "your-username"
-   password = "your-strong-password"
-   ```
-4. Save — your app is now password-protected.
-
-### 4. Share with your team
-Give them the Streamlit Cloud URL. They'll need the username + password to access.
+### 3. Done!
+Your dashboard is live at `https://logistics-dashboard.onrender.com`
+Share the URL + credentials with your team.
 
 ---
 
-## 📁 File Structure
+## 🧪 Local Development
+
+```bash
+pip install -r requirements.txt
+python3 app.py
+# Open http://localhost:5000
+# Login: admin / changeme
+```
+
+To change credentials locally, set env vars before starting:
+```bash
+export RENDER_USERNAME=myuser
+export RENDER_PASSWORD=mypassword
+python3 app.py
+```
+
+---
+
+## 📁 Files
 
 ```
 logistics-dashboard/
-  streamlit_app.py      # ⬅ Streamlit app (deploy this on Streamlit Cloud)
-  app.py                # Flask backend (also works standalone)
-  index.html            # HTML dashboard with charts, filters, KPIs
-  report_generator.py   # Shared Python report logic (PPT/Word/PDF)
-  requirements.txt      # Python dependencies
-  sonic_b2b.csv         # Sample CSV (sonic_b2b format)
-  customer_mis_sample.csv  # Sample CSV (Customer MIS format)
-  vendor/               # Frontend JS libraries
-  .streamlit/
-    secrets.toml        # Local secrets template
+  app.py               # Flask app with built-in auth + all report generators
+  index.html           # Frontend dashboard (charts, filters, KPIs)
+  requirements.txt     # Python deps
+  render.yaml          # Render deployment config (optional)
+  sonic_b2b.csv        # Sample CSV (format 1)
+  customer_mis_sample.csv  # Sample CSV (format 2)
+  vendor/              # Vendor JS libs
 ```
 
 ---
 
-## Local Development
+## 📊 Usage
 
-### Option A: Streamlit (recommended)
-```bash
-pip install -r requirements.txt
-cd logistics-dashboard
-streamlit run streamlit_app.py
-```
-Open `http://localhost:8501`. Login with credentials from `.streamlit/secrets.toml`.
-
-### Option B: Flask (full backend)
-```bash
-python3 app.py
-```
-Open `http://localhost:5000`. No built-in auth (add nginx for production).
-
----
-
-## 📊 How It Works
-
-1. **Upload** one or more CSV files (drag & drop or click to browse)
-2. **Dashboard** shows KPIs, charts, filters — switch between datasets or view merged
-3. **Generate** PPT, Word, PDF reports for each customer + consolidated report
-4. **Share** reports with your stakeholders
+1. Upload one or more CSV files (drag & drop)
+2. Switch between datasets or view **All (Merged)**
+3. Click **PPTs**, **Word**, or **PDF** to generate per-customer reports
+4. With 2+ files, a consolidated report is also created
+5. All reports download as a ZIP
 
 ### Supported CSV Formats
 
-| Format | Key Columns |
+| Format | Key columns |
 |--------|-------------|
-| **sonic_b2b** | `Order id`, `Client`, `Origin City`, `Destination City`, `Current Status`, `Manifest Date`, `Package Amount`, `Weight`, `No of boxes` |
+| **sonic_b2b** | `Order id`, `Client`, `Origin City`, `Destination City`, `Current Status`, `Package Amount`, `Weight`, `No of boxes` |
 | **Customer MIS** | `Reference Number`, `Customer Code`, `Sender City`, `Consignee City`, `Status`, `Declared Value`, `Weight`, `Num Pieces` |
 
-Auto-detected from column headers. No configuration needed.
+Auto-detected — no config needed.
 
 ---
 
-## About Streamlit Cloud
+## 🔒 Security
 
-- **Free tier**: unlimited public apps, 1 private app, 1 GB memory
-- **Private GitHub repo**: works fine — Streamlit Cloud integrates with GitHub
-- **Password protection**: built-in via `st.secrets` (no nginx needed)
-- **HTTPS**: automatically enabled by Streamlit Cloud
-- **Always-on**: your app stays running, wakes up on first visit after inactivity
-
----
-
-## Security
-
-- Credentials stored in Streamlit Secrets (encrypted at rest)
-- No data written to disk — all processing in memory
-- HTTPS enforced by Streamlit Cloud
-- GitHub repo can be private for extra security
+- **Built-in HTTP Basic Auth** — all routes require credentials
+- Credentials set via environment variables (`RENDER_USERNAME`, `RENDER_PASSWORD`)
+- Render provides **free HTTPS** (SSL) automatically
+- No data stored on disk — processed entirely in memory
+- GitHub repo can be **private** for extra protection

@@ -1,54 +1,60 @@
 #!/usr/bin/env python3
 """
-Logistics Dashboard — Flask backend for server-side report generation.
-Serves the static dashboard and provides API endpoints for PPT, Word, and PDF generation.
+Logistics Dashboard — Flask app with HTTP Basic Auth.
+Designed for Render.com deployment.
+Set RENDER_USERNAME and RENDER_PASSWORD env vars for auth.
 """
 
+import base64
 import io
 import os
 import re
 import zipfile
 from datetime import datetime, date
+from functools import wraps
 from pathlib import Path
 
 from flask import Flask, jsonify, request, send_file, render_template_string
 from pptx import Presentation
-from pptx.util import Inches, Pt, Emu
+from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
-from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
+from pptx.enum.text import PP_ALIGN
 from pptx.enum.shapes import MSO_SHAPE
 from docx import Document
-from docx.shared import Inches as DocInches, Pt as DocPt, RGBColor as DocRGB, Cm
+from docx.shared import Inches as DocInches, Pt as DocPt, RGBColor as DocRGB
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from fpdf import FPDF
 
-# ── App setup ──────────────────────────────────────────────────────────
-
 HERE = Path(__file__).parent
+
 app = Flask(__name__, static_folder=str(HERE), static_url_path='')
 
-# ── Colour palette ─────────────────────────────────────────────────────
+# ── Auth config ──────────────────────────────────────────────────────
+AUTH_USER = os.environ.get('RENDER_USERNAME', 'admin')
+AUTH_PASS = os.environ.get('RENDER_PASSWORD', 'changeme')
 
+def require_auth(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth = request.authorization
+        if not auth or auth.username != AUTH_USER or auth.password != AUTH_PASS:
+            return (
+                'Unauthorized',
+                401,
+                {'WWW-Authenticate': 'Basic realm="Logistics Dashboard"'},
+            )
+        return f(*args, **kwargs)
+    return decorated
+
+# ── Colours ──────────────────────────────────────────────────────────
 NAVY   = RGBColor(0x1E, 0x3A, 0x5F)
 BLUE   = RGBColor(0x25, 0x63, 0xEB)
 WHITE  = RGBColor(0xFF, 0xFF, 0xFF)
 DARK   = RGBColor(0x0F, 0x17, 0x2A)
 GRAY   = RGBColor(0x64, 0x74, 0x8B)
 LGRAY  = RGBColor(0x94, 0xA3, 0xB8)
-GREEN  = RGBColor(0x05, 0x96, 0x69)
-AMBER  = RGBColor(0xD9, 0x77, 0x06)
-RED    = RGBColor(0xDC, 0x26, 0x26)
-SUCCESS = RGBColor(0x05, 0x96, 0x69)
-WARN    = RGBColor(0xD9, 0x77, 0x06)
-DANGER  = RGBColor(0xDC, 0x26, 0x26)
 
-NAVY_HEX   = '#1E3A5F'
-BLUE_HEX   = '#2563EB'
-GRAY_HEX   = '#64748B'
-LGRAY_HEX  = '#94A3B8'
-
-# Number formatting
 def fmt_num(n):
     return f'{int(n):,}' if n == int(n) else f'{n:,.1f}'
 
@@ -68,23 +74,27 @@ def fmt_date(d):
             return d
     return '-'
 
-# ── Routes ─────────────────────────────────────────────────────────────
+def safe_text(t):
+    t = str(t)
+    reps = {'\u2014': '--', '\u2013': '-', '\u2018': "'", '\u2019': "'",
+            '\u201c': '"', '\u201d': '"', '\u2026': '...', '\u2022': '-',
+            '\u20b9': 'Rs.', '\u00a0': ' '}
+    for old, new in reps.items():
+        t = t.replace(old, new)
+    return t.encode('latin-1', errors='replace').decode('latin-1')
+
+# ── Routes ───────────────────────────────────────────────────────────
 
 @app.route('/')
+@require_auth
 def index():
     return send_file(str(HERE / 'index.html'))
 
 @app.route('/api/generate', methods=['POST'])
+@require_auth
 def api_generate():
-    """Generate reports from uploaded CSV files.
-    Accepts multipart form with:
-      - files: one or more CSV files
-      - format: 'ppt' | 'word' | 'pdf'
-    Returns a ZIP file containing the generated report(s).
-    """
     files = request.files.getlist('files')
     fmt = request.form.get('format', 'ppt')
-
     if not files:
         return jsonify({'error': 'No CSV files uploaded'}), 400
 
@@ -96,51 +106,48 @@ def api_generate():
     for fname, text in csv_texts.items():
         records = parse_csv(text)
         if records:
-            datasets.append({
-                'filename': fname,
-                'records': records,
-                'client': extract_client_name(records, fname),
-            })
+            client = ''
+            for k in records[0]:
+                kl = k.lower().strip()
+                if kl in ('client', 'customer code', 'customer'):
+                    client = str(records[0].get(k, '')).replace('`', '').strip().title()
+                    break
+            if not client:
+                client = fname.replace('.csv', '').replace('_', ' ').replace('-', ' ').title()
+            datasets.append({'records': records, 'client': client})
 
     if not datasets:
-        return jsonify({'error': 'No valid records found in CSVs'}), 400
+        return jsonify({'error': 'No valid records'}), 400
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
         for ds in datasets:
             report = build_report(ds['records'])
+            report['client'] = ds['client']
+            fn = safe_filename(ds['client'])
             if fmt == 'ppt':
-                ppt_bytes = generate_ppt(report)
-                zf.writestr(f"{safe_filename(ds['client'])}_Logistics_Report.pptx", ppt_bytes)
+                zf.writestr(f'{fn}_Logistics_Report.pptx', generate_ppt(report))
             elif fmt == 'word':
-                docx_bytes = generate_docx(report)
-                zf.writestr(f"{safe_filename(ds['client'])}_Logistics_Report.docx", docx_bytes)
+                zf.writestr(f'{fn}_Logistics_Report.docx', generate_docx(report))
             else:
-                pdf_bytes = generate_pdf(report)
-                zf.writestr(f"{safe_filename(ds['client'])}_Logistics_Report.pdf", pdf_bytes)
+                zf.writestr(f'{fn}_Logistics_Report.pdf', generate_pdf(report))
 
         if len(datasets) >= 2:
-            all_recs = []
-            for ds in datasets:
-                all_recs.extend(ds['records'])
-            merged_report = build_report(all_recs)
-            merged_report['client'] = 'All Customers (Consolidated)'
+            all_recs = [r for ds in datasets for r in ds['records']]
+            merged = build_report(all_recs)
+            merged['client'] = 'All Customers (Consolidated)'
             if fmt == 'ppt':
-                zf.writestr('All_Customers_Consolidated_Logistics_Report.pptx', generate_ppt(merged_report))
+                zf.writestr('All_Customers_Consolidated_Logistics_Report.pptx', generate_ppt(merged))
             elif fmt == 'word':
-                zf.writestr('All_Customers_Consolidated_Logistics_Report.docx', generate_docx(merged_report))
+                zf.writestr('All_Customers_Consolidated_Logistics_Report.docx', generate_docx(merged))
             else:
-                zf.writestr('All_Customers_Consolidated_Logistics_Report.pdf', generate_pdf(merged_report))
+                zf.writestr('All_Customers_Consolidated_Logistics_Report.pdf', generate_pdf(merged))
 
     buf.seek(0)
-    return send_file(
-        buf,
-        mimetype='application/zip',
-        as_attachment=True,
-        download_name=f'Logistics_Reports_{date.today().isoformat()}.zip'
-    )
+    return send_file(buf, mimetype='application/zip', as_attachment=True,
+                     download_name=f'Logistics_Reports_{date.today().isoformat()}.zip')
 
-# ── CSV parsing ────────────────────────────────────────────────────────
+# ── CSV Parsing ──────────────────────────────────────────────────────
 
 def parse_csv(text):
     text = text.lstrip('\ufeff')
@@ -153,163 +160,111 @@ def parse_csv(text):
         line = line.strip()
         if not line:
             continue
-        vals = parse_csv_line(line)
-        if len(vals) != len(header):
-            vals = (vals + [''] * len(header))[:len(header)]
-        rec = dict(zip(header, vals))
+        vals = []
+        current = ''
+        quoted = False
+        for ch in line:
+            if quoted:
+                if ch == '"':
+                    quoted = False
+                else:
+                    current += ch
+            elif ch == '"':
+                quoted = True
+            elif ch == ',':
+                vals.append(current.strip())
+                current = ''
+            else:
+                current += ch
+        vals.append(current.strip())
+        while len(vals) < len(header):
+            vals.append('')
+        rec = dict(zip(header, vals[:len(header)]))
         records.append(rec)
     return records
 
-def parse_csv_line(line):
-    result = []
-    current = ''
-    quoted = False
-    for ch in line:
-        if quoted:
-            if ch == '"':
-                quoted = False
-            else:
-                current += ch
-        elif ch == '"':
-            quoted = True
-        elif ch == ',':
-            result.append(current.strip())
-            current = ''
-        else:
-            current += ch
-    result.append(current.strip())
-    return result
-
-def extract_client_name(records, filename):
-    sample = records[0] if records else {}
-    client_key = None
-    for k in sample:
-        kl = k.lower().strip()
-        if kl in ('client', 'customer code', 'customer'):
-            client_key = k
-            break
-    if client_key:
-        vals = {r.get(client_key, '') for r in records if r.get(client_key, '')}
-        vals = {v for v in vals if v.strip()}
-        if len(vals) == 1:
-            return list(vals)[0].replace('`', '').strip().title()
-    base = filename.replace('.csv', '').replace('_', ' ').replace('-', ' ').title()
-    return base
-
-def clean_val(v):
-    return str(v or '').replace('`', '').strip()
-
 def parse_num(v):
     try:
-        return float(clean_val(v).replace(',', ''))
+        return float(str(v or '').replace(',', '').replace('`', ''))
     except ValueError:
         return 0.0
 
 def parse_dt(v):
-    s = clean_val(v)
-    if not s:
-        return None
+    s = str(v or '').strip()
     m = re.match(r'(\d{4})-(\d{2})-(\d{2})', s)
     if m:
         return datetime(int(m[1]), int(m[2]), int(m[3]))
     return None
 
 def guess_state(city):
-    city_lower = (city or '').lower()
-    mapping = {
-        'bengaluru': 'Karnataka', 'bangalore': 'Karnataka',
-        'mumbai': 'Maharashtra', 'pune': 'Maharashtra', 'nagpur': 'Maharashtra', 'thane': 'Maharashtra',
-        'delhi': 'Delhi', 'new delhi': 'Delhi',
-        'hyderabad': 'Telangana',
-        'chennai': 'Tamil Nadu',
-        'kolkata': 'West Bengal',
-        'ahmedabad': 'Gujarat', 'jaipur': 'Rajasthan',
-        'lucknow': 'Uttar Pradesh', 'chandigarh': 'Chandigarh',
-    }
-    for k, v in mapping.items():
-        if k in city_lower:
+    c = (city or '').lower()
+    m = {'bengaluru': 'Karnataka', 'bangalore': 'Karnataka', 'mumbai': 'Maharashtra',
+         'pune': 'Maharashtra', 'nagpur': 'Maharashtra', 'thane': 'Maharashtra',
+         'delhi': 'Delhi', 'new delhi': 'Delhi', 'hyderabad': 'Telangana',
+         'chennai': 'Tamil Nadu', 'kolkata': 'West Bengal', 'ahmedabad': 'Gujarat',
+         'jaipur': 'Rajasthan', 'lucknow': 'Uttar Pradesh', 'chandigarh': 'Chandigarh'}
+    for k, v in m.items():
+        if k in c:
             return v
     return city or 'Unknown'
 
-# ── Report data builder ─────────────────────────────────────────────────
+def safe_filename(name):
+    return re.sub(r'[\\/:*?"<>|]+', '-', str(name or 'Report')).strip().replace(' ', '_')[:60]
+
+# ── Report Builder ───────────────────────────────────────────────────
 
 def build_report(records):
     normalized = []
     for r in records:
         raw = {k.lower().strip(): v for k, v in r.items()}
         n = {}
-        n['id'] = clean_val(raw.get('order id', raw.get('reference number', raw.get('lrn', ''))))
-        n['client'] = clean_val(raw.get('client', raw.get('customer code', raw.get('customer', ''))))
+        n['id'] = str(raw.get('order id', raw.get('reference number', raw.get('lrn', '')))).replace('`', '').strip()
+        n['client'] = str(raw.get('client', raw.get('customer code', raw.get('customer', '')))).replace('`', '').strip()
         n['boxes'] = parse_num(raw.get('no of boxes', raw.get('num pieces', '0')))
-        n['origin'] = clean_val(raw.get('origin city', raw.get('sender city', ''))).title()
-        n['dest'] = clean_val(raw.get('destination city', raw.get('consignee city', ''))).title()
-        warehouse = clean_val(raw.get('client location/warehouse', raw.get('origin hub name', '')))
-        n['warehouse'] = warehouse.title() if warehouse else 'Unassigned'
+        n['origin'] = str(raw.get('origin city', raw.get('sender city', ''))).strip().title()
+        n['dest'] = str(raw.get('destination city', raw.get('consignee city', ''))).strip().title()
+        wh = str(raw.get('client location/warehouse', raw.get('origin hub name', ''))).strip()
+        n['warehouse'] = wh.title() if wh else 'Unassigned'
         n['manifest'] = parse_dt(raw.get('manifest date', raw.get('created at', '')))
         n['pickup'] = parse_dt(raw.get('pickup date', raw.get('last pickup completed time', '')))
         n['promise'] = parse_dt(raw.get('promise date', raw.get('expected delivery date', raw.get('expected date', ''))))
         n['delivered'] = parse_dt(raw.get('delivered date', raw.get('delivered time', '')))
-        status = clean_val(raw.get('current status', raw.get('status', '')))
+        status = str(raw.get('current status', raw.get('status', ''))).strip()
         n['status'] = status
         n['is_delivered'] = status.lower() in ('delivered', 'delivered to consignee') or n['delivered'] is not None
-        n['state'] = clean_val(raw.get('state', '')).title()
-        if not n['state'] or n['state'] == 'Unknown':
-            n['state'] = guess_state(n['dest'])
+        state = str(raw.get('state', '')).strip().title()
+        n['state'] = state if state else guess_state(n['dest'])
         n['amount'] = parse_num(raw.get('package amount', raw.get('declared value', '0')))
         n['weight'] = parse_num(raw.get('weight', '0'))
         n['attempts'] = int(parse_num(raw.get('attempt count', '0')))
         n['last_scan'] = parse_dt(raw.get('last scan date', ''))
-        n['remarks'] = clean_val(raw.get('remarks', raw.get('delivery failure reason', '')))
-        n['zone'] = clean_val(raw.get('invoice zone', ''))
+        n['remarks'] = str(raw.get('remarks', raw.get('delivery failure reason', ''))).strip()
         normalized.append(n)
 
     shipments = len(normalized)
     delivered = sum(1 for r in normalized if r['is_delivered'])
     open_s = shipments - delivered
-    late_delivered = sum(1 for r in normalized if r['is_delivered'] and r['promise'] and r['delivered'] and r['delivered'] > r['promise'])
-    open_delayed = sum(1 for r in normalized if not r['is_delivered'] and r['promise'] and r['promise'] < datetime.now())
+    late = sum(1 for r in normalized if r['is_delivered'] and r['promise'] and r['delivered'] and r['delivered'] > r['promise'])
+    open_delay = sum(1 for r in normalized if not r['is_delivered'] and r['promise'] and r['promise'] < datetime.now())
+    dwp = [r for r in normalized if r['is_delivered'] and r['delivered'] and r['promise']]
+    on_time = sum(1 for r in dwp if r['delivered'] <= r['promise'])
+    on_rate = round(on_time / len(dwp) * 100) if dwp else 0
+    tat_r = [r for r in normalized if r['is_delivered'] and r['delivered'] and (r['pickup'] or r['manifest'])]
+    avg_tat = sum((r['delivered'] - (r['pickup'] or r['manifest'])).days for r in tat_r) / len(tat_r) if tat_r else 0
+    del_rate = round(delivered / shipments * 100) if shipments else 0
 
-    delivered_with_promise = [r for r in normalized if r['is_delivered'] and r['delivered'] and r['promise']]
-    on_time = sum(1 for r in delivered_with_promise if r['delivered'] <= r['promise'])
-    on_time_rate = round(on_time / len(delivered_with_promise) * 100) if delivered_with_promise else 0
-
-    tat_records = [r for r in normalized if r['is_delivered'] and r['delivered'] and (r['pickup'] or r['manifest'])]
-    avg_tat = 0
-    if tat_records:
-        days = []
-        for r in tat_records:
-            start = r['pickup'] or r['manifest']
-            days.append((r['delivered'] - start).days)
-        avg_tat = sum(days) / len(days) if days else 0
-
-    total_boxes = sum(r['boxes'] for r in normalized)
-    total_weight = sum(r['weight'] for r in normalized)
-    total_amount = sum(r['amount'] for r in normalized)
-    attempted = sum(1 for r in normalized if r['attempts'] > 0)
-    delivered_rate = round(delivered / shipments * 100) if shipments else 0
-
-    # status breakdown
-    status_counts = {}
+    sc = {}
     for r in normalized:
         s = r['status'] or 'Unknown'
-        status_counts[s] = status_counts.get(s, 0) + 1
-    status_entries = sorted(status_counts.items(), key=lambda x: -x[1])[:6]
-
-    # state counts
-    state_counts = {}
+        sc[s] = sc.get(s, 0) + 1
+    state_c = {}
     for r in normalized:
         st = r['state'] or 'Unknown'
-        state_counts[st] = state_counts.get(st, 0) + 1
-    state_entries = sorted(state_counts.items(), key=lambda x: -x[1])[:8]
-
-    # lanes
-    lane_counts = {}
+        state_c[st] = state_c.get(st, 0) + 1
+    lc = {}
     for r in normalized:
         lane = f"{r['origin']} -> {r['dest']}"
-        lane_counts[lane] = lane_counts.get(lane, 0) + 1
-    lane_entries = sorted(lane_counts.items(), key=lambda x: -x[1])[:10]
-
-    # aging
+        lc[lane] = lc.get(lane, 0) + 1
     aging = {'0-2d': 0, '3-5d': 0, '6-8d': 0, '9d+': 0}
     now = datetime.now()
     for r in normalized:
@@ -317,655 +272,377 @@ def build_report(records):
             start = r['pickup'] or r['manifest'] or r['last_scan']
             if start:
                 age = max(0, (now - start).days)
-                if age <= 2:
-                    aging['0-2d'] += 1
-                elif age <= 5:
-                    aging['3-5d'] += 1
-                elif age <= 8:
-                    aging['6-8d'] += 1
-                else:
-                    aging['9d+'] += 1
+                if age <= 2: aging['0-2d'] += 1
+                elif age <= 5: aging['3-5d'] += 1
+                elif age <= 8: aging['6-8d'] += 1
+                else: aging['9d+'] += 1
 
-    # priority records
-    priority = sorted(normalized, key=lambda r: (
-        0 if (not r['is_delivered'] and r['promise'] and r['promise'] < now) else
-        1 if not r['is_delivered'] else 2,
-        r['promise'] if r['promise'] else datetime.max
-    ))
+    priorities = sorted(normalized, key=lambda r: (
+        0 if (not r['is_delivered'] and r['promise'] and r['promise'] < now) else 1 if not r['is_delivered'] else 2,
+        r['promise'] if r['promise'] else datetime.max))
 
-    top_state = state_entries[0][0] if state_entries else 'No state'
-    top_lane = lane_entries[0][0] if lane_entries else 'No lane'
-    oldest_bucket = max(aging, key=aging.get)
-
-    insights = [
-        f"{delivered_rate}% delivery closure across {fmt_num(shipments)} shipments; {fmt_num(open_s)} remain open.",
-        f"{on_time_rate}% on-time delivery performance with {fmt_num(late_delivered)} late delivered shipments.",
-        f"{fmt_num(open_delayed)} open shipments past promise date — require ETA updates.",
-        f"{top_state} is the largest destination state with {fmt_num(state_entries[0][1])} shipments." if state_entries else '',
-        f"Highest volume lane: {top_lane} — {fmt_num(lane_entries[0][1])} shipments." if lane_entries else '',
-    ]
+    ts = sorted(sc.items(), key=lambda x: -x[1])[:6]
+    tstate = sorted(state_c.items(), key=lambda x: -x[1])[:8]
+    tl = sorted(lc.items(), key=lambda x: -x[1])[:10]
+    top_s = tstate[0][0] if tstate else '-'
+    top_l = tl[0][0] if tl else '-'
+    ob = max(aging, key=aging.get)
 
     return {
-        'client': clean_val(normalized[0].get('client', '')).title() if normalized else 'Customer',
-        'period': f"{fmt_date(normalized[0]['manifest'])} to {fmt_date(normalized[-1]['manifest'])}" if normalized and normalized[0]['manifest'] and normalized[-1]['manifest'] else 'Selected period',
-        'generated': f"Generated {datetime.now().strftime('%d %b %Y %H:%M')}",
-        'shipments': shipments,
-        'delivered': delivered,
-        'open': open_s,
-        'late_delivered': late_delivered,
-        'open_delayed': open_delayed,
-        'delivered_rate': delivered_rate,
-        'on_time_rate': on_time_rate,
-        'avg_tat': avg_tat,
-        'avg_tat_label': f'{avg_tat:.1f}d',
-        'total_boxes': total_boxes,
-        'total_weight': total_weight,
-        'total_amount': total_amount,
-        'attempted': attempted,
-        'value_label': fmt_money(total_amount),
-        'weight_label': f'{total_weight:.1f} kg',
-        'status_entries': status_entries,
-        'state_entries': state_entries,
-        'lane_entries': lane_entries,
-        'aging': aging,
-        'priority_records': priority[:14],
-        'insights': [i for i in insights if i],
-        'records': normalized,
+        'client': 'Customer',
+        'period': 'Selected period',
+        'generated': f'Generated {datetime.now().strftime("%d %b %Y %H:%M")}',
+        'shipments': shipments, 'delivered': delivered, 'open': open_s,
+        'late_delivered': late, 'open_delayed': open_delay,
+        'delivered_rate': del_rate, 'on_time_rate': on_rate,
+        'avg_tat': avg_tat, 'avg_tat_label': f'{avg_tat:.1f}d',
+        'total_boxes': round(sum(r['boxes'] for r in normalized)),
+        'total_weight': sum(r['weight'] for r in normalized),
+        'total_amount': sum(r['amount'] for r in normalized),
+        'attempted': sum(1 for r in normalized if r['attempts'] > 0),
+        'value_label': fmt_money(sum(r['amount'] for r in normalized)),
+        'weight_label': f'{sum(r["weight"] for r in normalized):.1f} kg',
+        'status_entries': ts, 'state_entries': tstate, 'lane_entries': tl,
+        'aging': aging, 'priority_records': priorities[:14],
+        'insights': [
+            f'{del_rate}% closure across {fmt_num(shipments)} shipments; {fmt_num(open_s)} remain open.',
+            f'{on_rate}% on-time delivery; {fmt_num(late)} late delivered.',
+            f'{fmt_num(open_delay)} open past promise — require ETA updates.',
+            f'{top_s} is top destination state.', f'Top lane: {top_l}.',
+        ], 'records': normalized,
     }
 
-def safe_filename(name):
-    return re.sub(r'[\\/:*?"<>|]+', '-', str(name or 'Report')).strip().replace(' ', '_')[:60]
-
 # ══════════════════════════════════════════════════════════════════════
-#  PPT Generator (python-pptx)
+#  PPT Generator
 # ══════════════════════════════════════════════════════════════════════
 
 def generate_ppt(report):
     prs = Presentation()
     prs.slide_width = Inches(13.33)
     prs.slide_height = Inches(7.5)
-
-    # ── helpers ──────────────────────────────────────────────────────
-    sw = Inches(13.33)
-    sh = Inches(7.5)
+    sw, sh = Inches(13.33), Inches(7.5)
     M = Inches(0.5)
 
-    def add_rect(slide, left, top, width, height, fill, line=None):
-        shape = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, left, top, width, height)
-        shape.fill.solid()
-        shape.fill.fore_color.rgb = fill
+    def rect(sl, x, y, w, h, fill, line=None):
+        s = sl.shapes.add_shape(MSO_SHAPE.RECTANGLE, x, y, w, h)
+        s.fill.solid(); s.fill.fore_color.rgb = fill
         if line:
-            shape.line.color.rgb = line
-            shape.line.width = Pt(0.7)
-        else:
-            shape.line.fill.background()
-        return shape
+            s.line.color.rgb = line; s.line.width = Pt(0.7)
+        else: s.line.fill.background()
+        return s
 
-    def add_text(slide, left, top, width, height, text, size=12, bold=False, color=DARK, align=PP_ALIGN.LEFT, font='Aptos'):
-        txBox = slide.shapes.add_textbox(left, top, width, height)
-        tf = txBox.text_frame
-        tf.word_wrap = True
-        p = tf.paragraphs[0]
-        p.text = str(text)
-        p.font.size = Pt(size)
-        p.font.bold = bold
-        p.font.color.rgb = color
-        p.font.name = font
-        p.alignment = align
-        return txBox
+    def txt(sl, x, y, w, h, text, size=12, bold=False, color=DARK, align=PP_ALIGN.LEFT):
+        tb = sl.shapes.add_textbox(x, y, w, h)
+        tf = tb.text_frame; tf.word_wrap = True
+        p = tf.paragraphs[0]; p.text = str(text)
+        p.font.size = Pt(size); p.font.bold = bold; p.font.color.rgb = color; p.font.name = 'Aptos'; p.alignment = align
+        return tb
 
-    def add_multiline(slide, left, top, width, height, lines, size=10, color=DARK, bold=False):
-        txBox = slide.shapes.add_textbox(left, top, width, height)
-        tf = txBox.text_frame
-        tf.word_wrap = True
-        for i, line in enumerate(lines):
-            if i == 0:
-                p = tf.paragraphs[0]
-            else:
-                p = tf.add_paragraph()
-            p.text = str(line)
-            p.font.size = Pt(size)
-            p.font.color.rgb = color
-            p.font.name = 'Aptos'
-            p.space_after = Pt(4)
+    def bullets(sl, x, y, w, h, lines, size=10, color=DARK):
+        tb = sl.shapes.add_textbox(x, y, w, h)
+        tf = tb.text_frame; tf.word_wrap = True
+        for i, l in enumerate(lines):
+            p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+            p.text = str(l); p.font.size = Pt(size); p.font.color.rgb = color; p.font.name = 'Aptos'; p.space_after = Pt(4)
 
-    def add_kpi_row(slide, metrics, y):
-        card_w = Inches(2.82)
-        card_h = Inches(0.98)
-        gap = Inches(0.3)
-        colors_fill = [RGBColor(0xEB, 0xF5, 0xFF), RGBColor(0xD1, 0xFA, 0xE5), RGBColor(0xFE, 0xF3, 0xC7), RGBColor(0xFE, 0xE2, 0xE2)]
-        colors_border = [RGBColor(0x93, 0xC5, 0xFD), RGBColor(0x6E, 0xE7, 0xB7), RGBColor(0xFC, 0xD3, 0x4D), RGBColor(0xFC, 0xA5, 0xA5)]
-        for i, (label, value, sub) in enumerate(metrics):
-            x = M + i * (card_w + gap)
-            add_rect(slide, x, y, card_w, card_h, colors_fill[i % 4], colors_border[i % 4])
-            add_text(slide, x + Inches(0.12), y + Inches(0.08), Inches(2.58), Inches(0.3),
-                     str(value), 18, True, DARK)
-            add_text(slide, x + Inches(0.12), y + Inches(0.46), Inches(2.58), Inches(0.17),
-                     label, 7.5, True, RGBColor(0x47, 0x55, 0x69))
-            add_text(slide, x + Inches(0.12), y + Inches(0.68), Inches(2.58), Inches(0.18),
-                     sub or '', 7, False, GRAY)
+    def kpi(sl, metrics, y):
+        cw, ch, gap = Inches(2.82), Inches(0.98), Inches(0.3)
+        fills = [RGBColor(0xEB,0xF5,0xFF), RGBColor(0xD1,0xFA,0xE5), RGBColor(0xFE,0xF3,0xC7), RGBColor(0xFE,0xE2,0xE2)]
+        borders = [RGBColor(0x93,0xC5,0xFD), RGBColor(0x6E,0xE7,0xB7), RGBColor(0xFC,0xD3,0x4D), RGBColor(0xFC,0xA5,0xA5)]
+        for i, (label, val, sub) in enumerate(metrics):
+            x = M + i * (cw + gap)
+            rect(sl, x, y, cw, ch, fills[i % 4], borders[i % 4])
+            txt(sl, x+Inches(0.12), y+Inches(0.08), Inches(2.58), Inches(0.3), str(val), 18, True, DARK)
+            txt(sl, x+Inches(0.12), y+Inches(0.46), Inches(2.58), Inches(0.17), label, 7.5, True, RGBColor(0x47,0x55,0x69))
+            txt(sl, x+Inches(0.12), y+Inches(0.68), Inches(2.58), Inches(0.18), sub or '', 7, False, GRAY)
 
-    def add_table(slide, rows, x, y, w, h, col_weights):
-        if not rows:
-            return
-        row_h = h / len(rows)
-        total_w = sum(col_weights)
+    def tbl(sl, rows, x, y, w, h, cw):
+        rh = h / len(rows)
+        tw = sum(cw)
         for ri, row in enumerate(rows):
             cx = x
-            for ci, cell_val in enumerate(row):
-                cw = int(w * col_weights[ci] / total_w)
-                is_header = ri == 0
-                fill = NAVY if is_header else (WHITE if ri % 2 == 0 else RGBColor(0xF1, 0xF5, 0xF9))
-                border = NAVY if is_header else RGBColor(0xDD, 0xE7, 0xF0)
-                add_rect(slide, cx, y + ri * row_h, cw, row_h, fill, border)
-                fs = 7 if is_header else 6.5
-                add_text(slide, cx + Inches(0.04), y + ri * row_h + Inches(0.03),
-                         cw - Inches(0.08), row_h - Inches(0.06),
-                         str(cell_val or ''), fs, is_header, WHITE if is_header else RGBColor(0x1F, 0x29, 0x37))
-                cx += cw
+            for ci, cv in enumerate(row):
+                cw_i = int(w * cw[ci] / tw)
+                is_h = ri == 0
+                fill = NAVY if is_h else (WHITE if ri % 2 == 0 else RGBColor(0xF1,0xF5,0xF9))
+                rect(sl, cx, y+ri*rh, cw_i, rh, fill, NAVY if is_h else RGBColor(0xDD,0xE7,0xF0))
+                txt(sl, cx+Inches(0.04), y+ri*rh+Inches(0.03), cw_i-Inches(0.08), rh-Inches(0.06),
+                    str(cv or ''), 7 if is_h else 6.5, is_h, WHITE if is_h else RGBColor(0x1F,0x29,0x37))
+                cx += cw_i
 
-    def add_chart_placeholder(slide, x, y, w, h, label):
-        add_rect(slide, x - Inches(0.02), y - Inches(0.3), w + Inches(0.04), h + Inches(0.38),
-                 WHITE, RGBColor(0xDD, 0xE7, 0xF0))
-        add_text(slide, x + Inches(0.06), y - Inches(0.26), w - Inches(0.12), Inches(0.2),
-                 label, 9, True, NAVY)
-        add_rect(slide, x, y, w, h, RGBColor(0xF8, 0xFA, 0xFC), RGBColor(0xDD, 0xE7, 0xF0))
-        add_text(slide, x, y + h // 2 - Inches(0.2), w, Inches(0.4),
-                 'Chart data', 10, False, GRAY, PP_ALIGN.CENTER)
+    def chart_ph(sl, x, y, w, h, label):
+        rect(sl, x-Inches(0.02), y-Inches(0.3), w+Inches(0.04), h+Inches(0.38), WHITE, RGBColor(0xDD,0xE7,0xF0))
+        txt(sl, x+Inches(0.06), y-Inches(0.26), w-Inches(0.12), Inches(0.2), label, 9, True, NAVY)
+        rect(sl, x, y, w, h, RGBColor(0xF8,0xFA,0xFC), RGBColor(0xDD,0xE7,0xF0))
+        txt(sl, x, y+h//2-Inches(0.2), w, Inches(0.4), 'Chart data', 10, False, GRAY, PP_ALIGN.CENTER)
 
-    def add_page_header(slide, title, subtitle='', description=''):
-        add_rect(slide, 0, 0, sw, Inches(0.08), NAVY)
-        add_text(slide, M, Inches(0.18), Inches(7.8), Inches(0.34), title, 20, True, DARK)
-        if subtitle:
-            add_text(slide, M, Inches(0.56), Inches(8.8), Inches(0.2), subtitle, 9, False, GRAY)
-        if description:
-            add_text(slide, M, Inches(0.78), Inches(8.8), Inches(0.17), description, 8, False, LGRAY)
+    def header(sl, title, sub='', desc=''):
+        rect(sl, 0, 0, sw, Inches(0.08), NAVY)
+        txt(sl, M, Inches(0.18), Inches(7.8), Inches(0.34), title, 20, True, DARK)
+        if sub: txt(sl, M, Inches(0.56), Inches(8.8), Inches(0.2), sub, 9, False, GRAY)
+        if desc: txt(sl, M, Inches(0.78), Inches(8.8), Inches(0.17), desc, 8, False, LGRAY)
 
-    def add_footer(slide, text, client):
-        add_rect(slide, 0, Inches(6.92), sw, Inches(0.01), RGBColor(0xCB, 0xD5, 0xE1))
-        add_text(slide, M, Inches(6.95), Inches(10.6), Inches(0.16), text or '', 7, False, LGRAY)
-        add_text(slide, Inches(11.25), Inches(6.95), Inches(1.65), Inches(0.16),
-                 client or 'Logistics', 7, True, NAVY, PP_ALIGN.RIGHT)
+    def footer(sl, text, client):
+        rect(sl, 0, Inches(6.92), sw, Inches(0.01), RGBColor(0xCB,0xD5,0xE1))
+        txt(sl, M, Inches(6.95), Inches(10.6), Inches(0.16), text or '', 7, False, LGRAY)
+        txt(sl, Inches(11.25), Inches(6.95), Inches(1.65), Inches(0.16), client or 'Logistics', 7, True, NAVY, PP_ALIGN.RIGHT)
 
-    def add_callout(slide, x, y, w, h, title, bullets, accent=BLUE):
-        add_rect(slide, x, y, w, h, RGBColor(0xF8, 0xFA, 0xFC), RGBColor(0xDD, 0xE7, 0xF0))
-        add_rect(slide, x, y, Inches(0.06), h, accent, accent)
-        add_text(slide, x + Inches(0.2), y + Inches(0.12), w - Inches(0.36), Inches(0.2),
-                 title, 9, True, DARK)
-        lines = [f'- {b}' for b in bullets[:5]]
-        add_multiline(slide, x + Inches(0.24), y + Inches(0.4), w - Inches(0.48), h - Inches(0.5),
-                      lines, 8.2, RGBColor(0x33, 0x41, 0x55))
+    def callout(sl, x, y, w, h, title, items, accent=BLUE):
+        rect(sl, x, y, w, h, RGBColor(0xF8,0xFA,0xFC), RGBColor(0xDD,0xE7,0xF0))
+        rect(sl, x, y, Inches(0.06), h, accent, accent)
+        txt(sl, x+Inches(0.2), y+Inches(0.12), w-Inches(0.36), Inches(0.2), title, 9, True, DARK)
+        bullets(sl, x+Inches(0.24), y+Inches(0.4), w-Inches(0.48), h-Inches(0.5),
+                [f'- {b}' for b in items[:5]], 8.2, RGBColor(0x33,0x41,0x55))
 
-    # ── Slide 1: Cover ───────────────────────────────────────────────
-    sl = prs.slides.add_slide(prs.slide_layouts[6])  # blank
-    add_rect(sl, 0, 0, sw, Inches(0.55), NAVY)
-    add_text(sl, Inches(0.5), Inches(0.08), Inches(12.3), Inches(0.4),
-             'MONTHLY LOGISTICS REPORT', 10, True, WHITE)
-    add_rect(sl, M, Inches(1.0), Inches(12.1), Inches(0.03), BLUE)
-    add_text(sl, M, Inches(1.28), Inches(8.5), Inches(0.55),
-             'Logistics Performance Report', 28, True, DARK)
-    add_text(sl, M + Inches(0.02), Inches(1.9), Inches(7.5), Inches(0.32),
-             report['client'], 16, True, NAVY)
-    add_text(sl, M + Inches(0.02), Inches(2.28), Inches(7.5), Inches(0.25),
-             report['period'], 11, False, GRAY)
-    add_rect(sl, M, Inches(2.75), Inches(12.1), Inches(0.02), RGBColor(0xCB, 0xD5, 0xE1))
-    add_kpi_row(sl, [
-        ('Total Shipments', fmt_num(report['shipments']), 'All consignments'),
-        ('Delivered', f"{report['delivered_rate']}%", f"{fmt_num(report['delivered'])} closed"),
-        ('On-Time Rate', f"{report['on_time_rate']}%", f"{fmt_num(report['late_delivered'])} late"),
-        ('Open Delayed', fmt_num(report['open_delayed']), f"{fmt_num(report['open'])} open"),
-    ], Inches(3.15))
-    add_callout(sl, Inches(0.72), Inches(4.65), Inches(11.9), Inches(1.55),
-                'Executive Summary', report['insights'][:3])
-    add_text(sl, M, Inches(6.94), Inches(10.8), Inches(0.18),
-             report['generated'], 7.5, False, LGRAY)
-    add_footer(sl, 'Confidential — For internal use only', report['client'])
-
-    # ── Slide 2: Executive Summary ───────────────────────────────────
+    # ── Slide 1: Cover ──
     sl = prs.slides.add_slide(prs.slide_layouts[6])
-    add_page_header(sl, 'Executive Summary', report['period'], 'Key metrics, trends, and aging overview')
-    add_kpi_row(sl, [
-        ('Package Value', report['value_label'], 'Declared invoice value'),
-        ('Total Boxes', fmt_num(report['total_boxes']), report['weight_label']),
-        ('Avg TAT', report['avg_tat_label'], 'Pickup to delivery'),
-        ('Attempted', fmt_num(report['attempted']), 'Shipments with attempt'),
-    ], Inches(0.95))
+    rect(sl, 0, 0, sw, Inches(0.55), NAVY)
+    txt(sl, Inches(0.5), Inches(0.08), Inches(12.3), Inches(0.4), 'MONTHLY LOGISTICS REPORT', 10, True, WHITE)
+    rect(sl, M, Inches(1.0), Inches(12.1), Inches(0.03), BLUE)
+    txt(sl, M, Inches(1.28), Inches(8.5), Inches(0.55), 'Logistics Performance Report', 28, True, DARK)
+    txt(sl, M+Inches(0.02), Inches(1.9), Inches(7.5), Inches(0.32), report['client'], 16, True, NAVY)
+    txt(sl, M+Inches(0.02), Inches(2.28), Inches(7.5), Inches(0.25), report['period'], 11, False, GRAY)
+    rect(sl, M, Inches(2.75), Inches(12.1), Inches(0.02), RGBColor(0xCB,0xD5,0xE1))
+    kpi(sl, [('Total Shipments', fmt_num(report['shipments']), 'All consignments'),
+             ('Delivered', f"{report['delivered_rate']}%", f"{fmt_num(report['delivered'])} closed"),
+             ('On-Time Rate', f"{report['on_time_rate']}%", f"{fmt_num(report['late_delivered'])} late"),
+             ('Open Delayed', fmt_num(report['open_delayed']), f"{fmt_num(report['open'])} open")], Inches(3.15))
+    callout(sl, Inches(0.72), Inches(4.65), Inches(11.9), Inches(1.55), 'Executive Summary', report['insights'][:3])
+    txt(sl, M, Inches(6.94), Inches(10.8), Inches(0.18), report['generated'], 7.5, False, LGRAY)
+    footer(sl, 'Confidential', report['client'])
 
-    left_x = M + Inches(0.05)
-    right_x = Inches(6.75)
-    tw = Inches(5.75)
-    add_callout(sl, left_x, Inches(2.22), tw, Inches(2.15), 'Key Insights', report['insights'])
-    status_rows = [['Status', 'Count', 'Share', 'Comment']]
-    total_s = max(1, report['shipments'])
+    # ── Slide 2: Exec ──
+    sl = prs.slides.add_slide(prs.slide_layouts[6])
+    header(sl, 'Executive Summary', report['period'], 'Key metrics, trends, and aging')
+    kpi(sl, [('Package Value', report['value_label'], 'Declared invoice value'),
+             ('Total Boxes', fmt_num(report['total_boxes']), report['weight_label']),
+             ('Avg TAT', report['avg_tat_label'], 'Pickup to delivery'),
+             ('Attempted', fmt_num(report['attempted']), 'With attempt')], Inches(0.95))
+    lx, rx, tw = M+Inches(0.05), Inches(6.75), Inches(5.75)
+    callout(sl, lx, Inches(2.22), tw, Inches(2.15), 'Key Insights', report['insights'])
+    sr = [['Status', 'Count', 'Share', 'Comment']]
+    ts = max(1, report['shipments'])
     for s, c in report['status_entries']:
-        share = round(c / total_s * 100)
-        comment = 'Closed' if s.lower() == 'delivered' else ('Moving' if 'transit' in s.lower() else 'Monitor')
-        status_rows.append([s, fmt_num(c), f'{share}%', comment])
-    add_table(sl, status_rows, right_x, Inches(2.22), tw, Inches(2.15), [2.4, 1.05, 1.05, 1.25])
+        sh = round(c / ts * 100); cm = 'Closed' if s.lower() == 'delivered' else ('Moving' if 'transit' in s.lower() else 'Monitor')
+        sr.append([s, fmt_num(c), f'{sh}%', cm])
+    tbl(sl, sr, rx, Inches(2.22), tw, Inches(2.15), [2.4, 1.05, 1.05, 1.25])
+    chart_ph(sl, lx, Inches(4.82), tw, Inches(1.75), 'Daily Manifest Trend')
+    ar = [['Open Aging', 'Count', 'Interpretation']]
+    for lb, vl in sorted(report['aging'].items()):
+        ar.append([lb, fmt_num(vl), 'Escalate' if lb == '9d+' else ('Watchlist' if lb == '6-8d' else 'Follow-up')])
+    tbl(sl, ar, rx, Inches(4.82), tw, Inches(1.75), [2.2, 1.2, 2.35])
+    footer(sl, report['generated'], report['client'])
 
-    add_chart_placeholder(sl, left_x, Inches(4.82), tw, Inches(1.75), 'Daily Manifest Trend')
-    aging_rows = [['Open Aging', 'Count', 'Interpretation']]
-    for label, val in sorted(report['aging'].items()):
-        note = 'Escalate' if label == '9d+' else ('Watchlist' if label == '6-8d' else 'Follow-up')
-        aging_rows.append([label, fmt_num(val), note])
-    add_table(sl, aging_rows, right_x, Inches(4.82), tw, Inches(1.75), [2.2, 1.2, 2.35])
-    add_footer(sl, report['generated'], report['client'])
-
-    # ── Slide 3: Performance ─────────────────────────────────────────
+    # ── Slide 3: Performance ──
     sl = prs.slides.add_slide(prs.slide_layouts[6])
-    add_page_header(sl, 'Service Performance', 'Delivery closure, promise adherence, and daily movement',
-                    'Operational metrics with visual breakdowns')
-    add_chart_placeholder(sl, Inches(0.5), Inches(1.02), Inches(5.95), Inches(4.35), 'Shipment Status Distribution')
-    add_chart_placeholder(sl, Inches(6.8), Inches(1.02), Inches(5.95), Inches(2.35), 'Daily Manifest Volume')
-    add_callout(sl, Inches(6.8), Inches(3.78), Inches(5.95), Inches(1.6), 'Performance Notes', [
-        f"{report['delivered_rate']}% of shipments closed delivered.",
-        f"{report['on_time_rate']}% met promise date.",
-        f"{fmt_num(report['open_delayed'])} open shipments past promise — review first.",
-    ], WARN)
-    add_footer(sl, report['generated'], report['client'])
+    header(sl, 'Service Performance', 'Delivery closure, promise adherence', 'Operational metrics')
+    chart_ph(sl, Inches(0.5), Inches(1.02), Inches(5.95), Inches(4.35), 'Shipment Status Distribution')
+    chart_ph(sl, Inches(6.8), Inches(1.02), Inches(5.95), Inches(2.35), 'Daily Manifest Volume')
+    callout(sl, Inches(6.8), Inches(3.78), Inches(5.95), Inches(1.6), 'Performance Notes', [
+        f"{report['delivered_rate']}% closed delivered.", f"{report['on_time_rate']}% met promise.",
+        f"{fmt_num(report['open_delayed'])} past promise."], RGBColor(0xD9,0x77,0x06))
+    footer(sl, report['generated'], report['client'])
 
-    # ── Slide 4: Network ─────────────────────────────────────────────
+    # ── Slide 4: Network ──
     sl = prs.slides.add_slide(prs.slide_layouts[6])
-    add_page_header(sl, 'Network & Movement', 'Geographic distribution, aging profile, and top lanes',
-                    'Destination states, open aging, and lane volumes')
-    add_chart_placeholder(sl, Inches(0.5), Inches(1.02), Inches(5.95), Inches(3.25), 'Top Destination States')
-    add_chart_placeholder(sl, Inches(6.8), Inches(1.02), Inches(5.95), Inches(3.25), 'Open Shipment Aging')
-    lane_rows = [['Lane', 'Shipments', 'Delivered', 'Open', 'Rate']]
-    for lane_name, count in report['lane_entries'][:6]:
-        lane_recs = [r for r in report['records'] if f"{r['origin']} -> {r['dest']}" == lane_name]
-        lane_del = sum(1 for r in lane_recs if r['is_delivered'])
-        rate = round(lane_del / count * 100) if count else 0
-        lane_rows.append([lane_name[:46], fmt_num(count), fmt_num(lane_del), fmt_num(count - lane_del), f'{rate}%'])
-    add_table(sl, lane_rows, Inches(0.55), Inches(4.82), Inches(12.1), Inches(1.65), [5.3, 1.65, 1.65, 1.65, 1.85])
-    add_footer(sl, report['generated'], report['client'])
+    header(sl, 'Network & Movement', 'Geographic distribution, aging, top lanes', 'States, aging, and lanes')
+    chart_ph(sl, Inches(0.5), Inches(1.02), Inches(5.95), Inches(3.25), 'Top Destination States')
+    chart_ph(sl, Inches(6.8), Inches(1.02), Inches(5.95), Inches(3.25), 'Open Shipment Aging')
+    lr = [['Lane', 'Shipments', 'Delivered', 'Open', 'Rate']]
+    for lane, count in report['lane_entries'][:6]:
+        lr_recs = [r for r in report['records'] if f"{r['origin']} -> {r['dest']}" == lane]
+        ld = sum(1 for r in lr_recs if r['is_delivered'])
+        rt = round(ld / count * 100) if count else 0
+        lr.append([lane[:46], fmt_num(count), fmt_num(ld), fmt_num(count-ld), f'{rt}%'])
+    tbl(sl, lr, Inches(0.55), Inches(4.82), Inches(12.1), Inches(1.65), [5.3, 1.65, 1.65, 1.65, 1.85])
+    footer(sl, report['generated'], report['client'])
 
-    # ── Slide 5: Exceptions ──────────────────────────────────────────
+    # ── Slide 5: Exceptions ──
     sl = prs.slides.add_slide(prs.slide_layouts[6])
-    add_page_header(sl, 'Exceptions & Priority Items', 'Delayed, late, and open shipments',
-                    'Actionable items for customer review')
-    add_callout(sl, Inches(0.55), Inches(0.98), Inches(12.1), Inches(0.88),
-                'Recommended Actions', [
-                    'Prioritize open delayed shipments — confirm ETAs with customers immediately.',
-                    'Review late-delivered lanes to identify recurring network or appointment issues.',
-                ], DANGER)
-    exc_rows = [['Order', 'Destination', 'Status', 'Promise', 'Last Scan', 'Amount', 'Action']]
+    header(sl, 'Exceptions & Priority Items', 'Delayed and open shipments', 'Actionable items')
+    callout(sl, Inches(0.55), Inches(0.98), Inches(12.1), Inches(0.88), 'Recommended Actions', [
+        'Prioritize open delayed — confirm ETAs immediately.',
+        'Review late-delivered lanes for recurring issues.'], RGBColor(0xDC,0x26,0x26))
+    er = [['Order', 'Destination', 'Status', 'Promise', 'Last Scan', 'Amount', 'Action']]
     now = datetime.now()
     for r in report['priority_records'][:8]:
-        is_delayed = not r['is_delivered'] and r['promise'] and r['promise'] < now
-        is_late = r['is_delivered'] and r['promise'] and r['delivered'] and r['delivered'] > r['promise']
-        if not r['is_delivered'] or is_delayed or is_late:
-            status_label = 'Delayed' if is_delayed else ('Delivered' if r['is_delivered'] else 'Open')
-            action = 'Expedite / confirm ETA' if is_delayed else ('Review late reason' if r['is_delivered'] else 'Track movement')
-            exc_rows.append([
-                r['id'][:22], f"{r['dest']}, {r['state']}"[:28], status_label,
-                fmt_date(r['promise']), fmt_date(r['last_scan']), fmt_money(r['amount']), action,
-            ])
-    add_table(sl, exc_rows, Inches(0.55), Inches(2.18), Inches(12.1), Inches(4.2),
-              [2.05, 2.4, 1.35, 1.35, 1.65, 1.45, 1.85])
-    add_footer(sl, report['generated'], report['client'])
+        delayed = not r['is_delivered'] and r['promise'] and r['promise'] < now
+        if not r['is_delivered'] or delayed:
+            slbl = 'Delayed' if delayed else ('Delivered' if r['is_delivered'] else 'Open')
+            act = 'Expedite / confirm ETA' if delayed else ('Review late reason' if r['is_delivered'] else 'Track')
+            er.append([r['id'][:22], f"{r['dest']}, {r['state']}"[:28], slbl,
+                       fmt_date(r['promise']), fmt_date(r['last_scan']), fmt_money(r['amount']), act])
+    tbl(sl, er, Inches(0.55), Inches(2.18), Inches(12.1), Inches(4.2), [2.05, 2.4, 1.35, 1.35, 1.65, 1.45, 1.85])
+    footer(sl, report['generated'], report['client'])
 
-    buf = io.BytesIO()
-    prs.save(buf)
-    return buf.getvalue()
-
+    buf = io.BytesIO(); prs.save(buf); return buf.getvalue()
 
 # ══════════════════════════════════════════════════════════════════════
-#  DOCX Generator (python-docx)
+#  DOCX Generator
 # ══════════════════════════════════════════════════════════════════════
 
 def generate_docx(report):
     doc = Document()
-    style = doc.styles['Normal']
-    style.font.name = 'Aptos'
-    style.font.size = DocPt(10)
-    style.paragraph_format.space_after = DocPt(4)
+    style = doc.styles['Normal']; style.font.name = 'Aptos'; style.font.size = DocPt(10); style.paragraph_format.space_after = DocPt(4)
 
-    # ── Title ────────────────────────────────────────────────────────
-    p = doc.add_heading('LOGISTICS PERFORMANCE REPORT', level=0)
-    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    for run in p.runs:
-        run.font.color.rgb = DocRGB(0x1E, 0x3A, 0x5F)
+    def add_heading(text, level=0, color='1E3A5F'):
+        p = doc.add_heading(text, level=level)
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER if level == 0 else WD_ALIGN_PARAGRAPH.LEFT
+        for r in p.runs: r.font.color.rgb = DocRGB(*bytes.fromhex(color))
 
-    p = doc.add_paragraph()
-    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = p.add_run(report['client'])
-    run.bold = True
-    run.font.size = DocPt(16)
-    run.font.color.rgb = DocRGB(0x25, 0x63, 0xEB)
-
-    p = doc.add_paragraph()
-    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = p.add_run(report['period'])
-    run.font.size = DocPt(10)
-    run.font.color.rgb = DocRGB(0x64, 0x74, 0x8B)
-
-    p = doc.add_paragraph()
-    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = p.add_run(report['generated'])
-    run.font.size = DocPt(8)
-    run.font.color.rgb = DocRGB(0x94, 0xA3, 0xB8)
-
+    add_heading('LOGISTICS PERFORMANCE REPORT', 0)
+    p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r = p.add_run(report['client']); r.bold = True; r.font.size = DocPt(16); r.font.color.rgb = DocRGB(0x25,0x63,0xEB)
+    p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r = p.add_run(report['period']); r.font.size = DocPt(10); r.font.color.rgb = DocRGB(0x64,0x74,0x8B)
+    p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r = p.add_run(report['generated']); r.font.size = DocPt(8); r.font.color.rgb = DocRGB(0x94,0xA3,0xB8)
     doc.add_paragraph().add_run().add_break()
 
-    # ── Executive Summary ────────────────────────────────────────────
     doc.add_heading('Executive Summary', level=1)
     p = doc.add_paragraph()
-    run = p.add_run(
-        f"Total Shipments: {fmt_num(report['shipments'])}  |  "
-        f"Delivered: {report['delivered_rate']}%  |  "
-        f"On-Time: {report['on_time_rate']}%  |  "
-        f"Open Delayed: {fmt_num(report['open_delayed'])}"
-    )
-    run.font.size = DocPt(10)
-    run.font.color.rgb = DocRGB(0x33, 0x33, 0x33)
+    r = p.add_run(f"Total Shipments: {fmt_num(report['shipments'])} | Delivered: {report['delivered_rate']}% | On-Time: {report['on_time_rate']}% | Open Delayed: {fmt_num(report['open_delayed'])}")
+    r.font.size = DocPt(10); r.font.color.rgb = DocRGB(0x33,0x33,0x33)
+    for ins in report['insights']:
+        p = doc.add_paragraph(style='List Bullet'); r = p.add_run(ins); r.font.size = DocPt(9); r.font.color.rgb = DocRGB(0x47,0x55,0x69)
 
-    for insight in report['insights']:
-        p = doc.add_paragraph(style='List Bullet')
-        run = p.add_run(insight)
-        run.font.size = DocPt(9)
-        run.font.color.rgb = DocRGB(0x47, 0x55, 0x69)
-
-    # ── Tables ───────────────────────────────────────────────────────
-    sections_data = [
-        ('Status Breakdown', report['status_entries'], ['Status', 'Count', 'Share', 'Comment'],
-         lambda s, c: [s, fmt_num(c), f"{round(c / max(1, report['shipments']) * 100)}%",
-                       'Closed' if s.lower() == 'delivered' else ('Moving' if 'transit' in s.lower() else 'Monitor')]),
-        ('Open Aging', sorted(report['aging'].items()), ['Aging', 'Count', 'Interpretation'],
-         lambda label, val: [label, fmt_num(val),
-                             'Escalate' if label == '9d+' else ('Watchlist' if label == '6-8d' else 'Follow-up')]),
-        ('Top Lanes', report['lane_entries'][:6], ['Lane', 'Shipments', 'Delivered', 'Open', 'Rate'],
-         lambda lane, count: [lane[:50], fmt_num(count),
-                              fmt_num(sum(1 for r in report['records'] if r['is_delivered'] and f"{r['origin']} -> {r['dest']}" == lane)),
-                              '—', '—']),
-    ]
-
-    for title, entries, headers, row_fn in sections_data:
+    def build_table(title, headers, data_rows):
         doc.add_heading(title, level=2)
-        table = doc.add_table(rows=1 + len(entries), cols=len(headers))
-        table.style = 'Table Grid'
-        table.alignment = WD_TABLE_ALIGNMENT.CENTER
-
+        t = doc.add_table(rows=1+len(data_rows), cols=len(headers))
+        t.style = 'Table Grid'; t.alignment = WD_TABLE_ALIGNMENT.CENTER
         for i, h in enumerate(headers):
-            cell = table.rows[0].cells[i]
-            cell.text = h
-            for paragraph in cell.paragraphs:
-                paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                for run in paragraph.runs:
-                    run.bold = True
-                    run.font.size = DocPt(9)
-                    run.font.color.rgb = DocRGB(0x1E, 0x3A, 0x5F)
+            cell = t.rows[0].cells[i]; cell.text = h
+            for p in cell.paragraphs:
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                for r in p.runs: r.bold = True; r.font.size = DocPt(9); r.font.color.rgb = DocRGB(0x1E,0x3A,0x5F)
             from docx.oxml.ns import qn
-            shading = cell._element.get_or_add_tcPr()
-            shading_elem = shading.makeelement(qn('w:shd'), {
-                qn('w:fill'): 'EBF5FF',
-                qn('w:val'): 'clear'
-            })
-            shading.append(shading_elem)
-
-        for ri, (key, val) in enumerate(entries):
-            cells = table.rows[ri + 1].cells
-            row_data = row_fn(key, val)
-            for ci, text in enumerate(row_data):
-                cells[ci].text = str(text)
-                for paragraph in cells[ci].paragraphs:
-                    for run in paragraph.runs:
-                        run.font.size = DocPt(8)
-
+            sh = cell._element.get_or_add_tcPr()
+            sh.append(sh.makeelement(qn('w:shd'), {qn('w:fill'): 'EBF5FF', qn('w:val'): 'clear'}))
+        for ri, row in enumerate(data_rows):
+            for ci, cv in enumerate(row):
+                t.rows[ri+1].cells[ci].text = str(cv)
         doc.add_paragraph()
 
-    # ── Exceptions Table ─────────────────────────────────────────────
-    doc.add_heading('Priority Exceptions', level=2)
+    build_table('Status Breakdown', ['Status', 'Count', 'Share', 'Comment'],
+                [[s, fmt_num(c), f"{round(c/max(1,report['shipments'])*100)}%",
+                  'Closed' if s.lower()=='delivered' else ('Moving' if 'transit' in s.lower() else 'Monitor')]
+                 for s, c in report['status_entries']])
+    build_table('Open Aging', ['Aging', 'Count', 'Interpretation'],
+                [[lb, fmt_num(vl), 'Escalate' if lb=='9d+' else ('Watchlist' if lb=='6-8d' else 'Follow-up')]
+                 for lb, vl in sorted(report['aging'].items())])
+    build_table('Top Lanes', ['Lane', 'Shipments', 'Delivered', 'Open', 'Rate'],
+                [[l[:50], fmt_num(c), '--', '--', '--'] for l, c in report['lane_entries'][:6]])
+
     now = datetime.now()
-    exc_headers = ['Order', 'Destination', 'Status', 'Promise', 'Last Scan', 'Amount', 'Action']
-    exc_data = []
+    exc = []
     for r in report['priority_records'][:8]:
-        is_delayed = not r['is_delivered'] and r['promise'] and r['promise'] < now
-        if not r['is_delivered'] or is_delayed:
-            status_label = 'Delayed' if is_delayed else ('Delivered' if r['is_delivered'] else 'Open')
-            action = 'Expedite / confirm ETA' if is_delayed else ('Review late reason' if r['is_delivered'] else 'Track movement')
-            exc_data.append([
-                r['id'][:22], f"{r['dest']}, {r['state']}"[:28], status_label,
-                fmt_date(r['promise']), fmt_date(r['last_scan']), fmt_money(r['amount']), action,
-            ])
+        d = not r['is_delivered'] and r['promise'] and r['promise'] < now
+        if not r['is_delivered'] or d:
+            exc.append([r['id'][:22], f"{r['dest']}, {r['state']}"[:28], 'Delayed' if d else ('Delivered' if r['is_delivered'] else 'Open'),
+                        fmt_date(r['promise']), fmt_date(r['last_scan']), fmt_money(r['amount']),
+                        'Expedite' if d else ('Review' if r['is_delivered'] else 'Track')])
+    if exc:
+        build_table('Priority Exceptions', ['Order', 'Destination', 'Status', 'Promise', 'Last Scan', 'Amount', 'Action'], exc)
 
-    if exc_data:
-        table = doc.add_table(rows=1 + len(exc_data), cols=len(exc_headers))
-        table.style = 'Table Grid'
-        table.alignment = WD_TABLE_ALIGNMENT.CENTER
-        for i, h in enumerate(exc_headers):
-            cell = table.rows[0].cells[i]
-            cell.text = h
-            for paragraph in cell.paragraphs:
-                paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                for run in paragraph.runs:
-                    run.bold = True
-                    run.font.size = DocPt(9)
-                    run.font.color.rgb = DocRGB(0x1E, 0x3A, 0x5F)
-            from docx.oxml.ns import qn
-            shading = cell._element.get_or_add_tcPr()
-            shading_elem = shading.makeelement(qn('w:shd'), {
-                qn('w:fill'): 'FFF0F0',
-                qn('w:val'): 'clear'
-            })
-            shading.append(shading_elem)
-
-        for ri, row_data in enumerate(exc_data):
-            for ci, text in enumerate(row_data):
-                table.rows[ri + 1].cells[ci].text = str(text)
-
-    buf = io.BytesIO()
-    doc.save(buf)
-    return buf.getvalue()
-
+    buf = io.BytesIO(); doc.save(buf); return buf.getvalue()
 
 # ══════════════════════════════════════════════════════════════════════
 #  PDF Generator (fpdf2)
 # ══════════════════════════════════════════════════════════════════════
 
-def safe_text(t):
-    """Replace special chars not supported by fpdf2 latin-1 fonts."""
-    replacements = {
-        '\u2014': '--', '\u2013': '-', '\u2018': "'", '\u2019': "'",
-        '\u201c': '"', '\u201d': '"', '\u2026': '...', '\u2022': '-',
-        '\u00b0': ' deg', '\u2122': '(TM)', '\u00ae': '(R)',
-        '\u00a0': ' ', '\u20b9': 'Rs.', '\ufffd': '',
-    }
-    t = str(t)
-    for old, new in replacements.items():
-        t = t.replace(old, new)
-    return t.encode('latin-1', errors='replace').decode('latin-1')
-
 class LogisticsPDF(FPDF):
     def header(self):
         self.set_font('Helvetica', 'B', 8)
         self.set_text_color(0x1E, 0x3A, 0x5F)
-        self.cell(0, 6, 'LOGISTICS PERFORMANCE REPORT', align='C')
-        self.ln(8)
-        self.set_draw_color(0x25, 0x63, 0xEB)
-        self.set_line_width(0.5)
-        self.line(10, self.get_y(), 200, self.get_y())
-        self.ln(4)
-
+        self.cell(0, 6, 'LOGISTICS PERFORMANCE REPORT', align='C'); self.ln(8)
+        self.set_draw_color(0x25, 0x63, 0xEB); self.set_line_width(0.5)
+        self.line(10, self.get_y(), 200, self.get_y()); self.ln(4)
     def footer(self):
-        self.set_y(-15)
-        self.set_font('Helvetica', '', 7)
+        self.set_y(-15); self.set_font('Helvetica', '', 7)
         self.set_text_color(0x94, 0xA3, 0xB8)
         self.cell(0, 10, f'Page {self.page_no()}/{{nb}}', align='C')
-
-    def section_title(self, title):
-        self.set_font('Helvetica', 'B', 13)
-        self.set_text_color(0x1E, 0x3A, 0x5F)
-        self.cell(0, 8, title)
-        self.ln(6)
-        self.set_draw_color(0x25, 0x63, 0xEB)
-        self.set_line_width(0.3)
-        self.line(10, self.get_y(), 200, self.get_y())
-        self.ln(4)
-
-    def sub_title(self, title):
-        self.set_font('Helvetica', 'B', 10)
-        self.set_text_color(0x1E, 0x3A, 0x5F)
-        self.cell(0, 7, title)
-        self.ln(5)
-
-    def body_text(self, text, size=9, color=(0x33, 0x33, 0x33)):
-        self.set_font('Helvetica', '', size)
-        self.set_text_color(*color)
-        self.multi_cell(0, 5, safe_text(text))
-        self.ln(1)
-
-    def kpi_card(self, x, y, w, h, value, label, sub, bg, border):
-        self.set_fill_color(*bg)
-        self.set_draw_color(*border)
-        self.set_line_width(0.3)
+    def section(self, title):
+        self.set_font('Helvetica', 'B', 13); self.set_text_color(0x1E,0x3A,0x5F)
+        self.cell(0, 8, title); self.ln(6)
+        self.set_draw_color(0x25,0x63,0xEB); self.set_line_width(0.3)
+        self.line(10, self.get_y(), 200, self.get_y()); self.ln(4)
+    def sub(self, title):
+        self.set_font('Helvetica', 'B', 10); self.set_text_color(0x1E,0x3A,0x5F)
+        self.cell(0, 7, title); self.ln(5)
+    def body(self, text, size=9, color=(0x33,0x33,0x33)):
+        self.set_font('Helvetica', '', size); self.set_text_color(*color)
+        self.multi_cell(0, 5, safe_text(text)); self.ln(1)
+    def kpi(self, x, y, w, h, val, label, sub, bg, border):
+        self.set_fill_color(*bg); self.set_draw_color(*border); self.set_line_width(0.3)
         self.rect(x, y, w, h, 'DF')
-        self.set_xy(x + 2, y + 1.5)
-        self.set_font('Helvetica', 'B', 14)
-        self.set_text_color(0x0F, 0x17, 0x2A)
-        self.cell(w - 4, 6, safe_text(str(value)))
-        self.set_xy(x + 2, y + 8)
-        self.set_font('Helvetica', 'B', 6.5)
-        self.set_text_color(0x47, 0x55, 0x69)
-        self.cell(w - 4, 4, safe_text(label))
-        self.set_xy(x + 2, y + 12.5)
-        self.set_font('Helvetica', '', 6)
-        self.set_text_color(0x64, 0x74, 0x8B)
-        self.cell(w - 4, 4, safe_text(sub))
-
-    def data_table(self, headers, rows, col_widths=None, header_bg=(0x1E, 0x3A, 0x5F)):
-        if not rows:
-            return
-        if col_widths is None:
-            col_widths = [190 // len(headers)] * len(headers)
-        total_w = sum(col_widths)
-        scale = 190 / total_w
-        col_widths = [w * scale for w in col_widths]
-
-        # header
-        self.set_fill_color(*header_bg)
-        self.set_text_color(255, 255, 255)
-        self.set_font('Helvetica', 'B', 6.5)
+        self.set_xy(x+2, y+1.5); self.set_font('Helvetica','B',14); self.set_text_color(0x0F,0x17,0x2A)
+        self.cell(w-4, 6, safe_text(str(val)))
+        self.set_xy(x+2, y+8); self.set_font('Helvetica','B',6.5); self.set_text_color(0x47,0x55,0x69)
+        self.cell(w-4, 4, safe_text(label))
+        self.set_xy(x+2, y+12.5); self.set_font('Helvetica','',6); self.set_text_color(0x64,0x74,0x8B)
+        self.cell(w-4, 4, safe_text(sub))
+    def table(self, headers, rows, cw=None, hbg=(0x1E,0x3A,0x5F)):
+        if not rows: return
+        if not cw: cw = [190//len(headers)]*len(headers)
+        tw = sum(cw); cw = [w*190/tw for w in cw]
+        self.set_fill_color(*hbg); self.set_text_color(255,255,255); self.set_font('Helvetica','B',6.5)
         for i, h in enumerate(headers):
-            self.cell(col_widths[i], 6, h, border=1, fill=True, align='C')
+            self.cell(cw[i], 6, h, border=1, fill=True, align='C')
         self.ln()
-
-        # rows
         for ri, row in enumerate(rows):
-            if ri % 2 == 0:
-                self.set_fill_color(255, 255, 255)
-            else:
-                self.set_fill_color(0xF8, 0xFA, 0xFC)
-            self.set_text_color(0x33, 0x33, 0x33)
-            self.set_font('Helvetica', '', 6.5)
-            max_h = 5
-            for ci, cell_val in enumerate(row):
-                text = safe_text(str(cell_val or ''))[:60]
-                self.cell(col_widths[ci], max_h, text, border=1, fill=True)
+            self.set_fill_color(255,255,255 if ri%2==0 else 0xF8) if ri%2==0 else self.set_fill_color(0xF8,0xFA,0xFC)
+            self.set_text_color(0x33,0x33,0x33); self.set_font('Helvetica','',6.5)
+            for ci, cv in enumerate(row):
+                self.cell(cw[ci], 5, safe_text(str(cv or ''))[:60], border=1, fill=True)
             self.ln()
 
-
 def generate_pdf(report):
-    pdf = LogisticsPDF()
-    pdf.alias_nb_pages()
-    pdf.set_auto_page_break(auto=True, margin=20)
-    pdf.add_page()
-
-    # ── Title block ──────────────────────────────────────────────────
-    pdf.set_font('Helvetica', 'B', 20)
-    pdf.set_text_color(0x1E, 0x3A, 0x5F)
-    pdf.cell(0, 10, 'LOGISTICS PERFORMANCE REPORT', align='C')
-    pdf.ln(12)
-
-    pdf.set_font('Helvetica', 'B', 12)
-    pdf.set_text_color(0x25, 0x63, 0xEB)
-    pdf.cell(0, 7, report['client'], align='C')
-    pdf.ln(7)
-
-    pdf.set_font('Helvetica', '', 8)
-    pdf.set_text_color(0x64, 0x74, 0x8B)
-    pdf.cell(0, 5, report['period'], align='C')
-    pdf.ln(5)
-
-    pdf.set_font('Helvetica', '', 7)
-    pdf.set_text_color(0x94, 0xA3, 0xB8)
-    pdf.cell(0, 5, report['generated'], align='C')
-    pdf.ln(10)
-
-    # ── KPI row ──────────────────────────────────────────────────────
+    pdf = LogisticsPDF(); pdf.alias_nb_pages(); pdf.set_auto_page_break(auto=True, margin=20); pdf.add_page()
+    pdf.set_font('Helvetica', 'B', 20); pdf.set_text_color(0x1E,0x3A,0x5F)
+    pdf.cell(0, 10, 'LOGISTICS PERFORMANCE REPORT', align='C'); pdf.ln(12)
+    pdf.set_font('Helvetica', 'B', 12); pdf.set_text_color(0x25,0x63,0xEB)
+    pdf.cell(0, 7, report['client'], align='C'); pdf.ln(7)
+    pdf.set_font('Helvetica', '', 8); pdf.set_text_color(0x64,0x74,0x8B)
+    pdf.cell(0, 5, report['period'], align='C'); pdf.ln(5)
+    pdf.set_font('Helvetica', '', 7); pdf.set_text_color(0x94,0xA3,0xB8)
+    pdf.cell(0, 5, report['generated'], align='C'); pdf.ln(10)
     cards = [
-        (fmt_num(report['shipments']), 'Total Shipments', 'All consignments',
-         (0xEB, 0xF5, 0xFF), (0x93, 0xC5, 0xFD)),
-        (f"{report['delivered_rate']}%", 'Delivered', f"{fmt_num(report['delivered'])} closed",
-         (0xD1, 0xFA, 0xE5), (0x6E, 0xE7, 0xB7)),
-        (f"{report['on_time_rate']}%", 'On-Time', f"{fmt_num(report['late_delivered'])} late",
-         (0xFE, 0xF3, 0xC7), (0xFC, 0xD3, 0x4D)),
-        (fmt_num(report['open_delayed']), 'Open Delayed', f"{fmt_num(report['open'])} open",
-         (0xFE, 0xE2, 0xE2), (0xFC, 0xA5, 0xA5)),
-    ]
-    card_w = 46
-    gap = 2
-    start_x = 10
-    for i, (val, label, sub, bg, border) in enumerate(cards):
-        x = start_x + i * (card_w + gap)
-        pdf.kpi_card(x, pdf.get_y(), card_w, 16, val, label, sub, bg, border)
+        (fmt_num(report['shipments']), 'Total Shipments', 'All consignments', (0xEB,0xF5,0xFF), (0x93,0xC5,0xFD)),
+        (f"{report['delivered_rate']}%", 'Delivered', f"{fmt_num(report['delivered'])} closed", (0xD1,0xFA,0xE5), (0x6E,0xE7,0xB7)),
+        (f"{report['on_time_rate']}%", 'On-Time', f"{fmt_num(report['late_delivered'])} late", (0xFE,0xF3,0xC7), (0xFC,0xD3,0x4D)),
+        (fmt_num(report['open_delayed']), 'Open Delayed', f"{fmt_num(report['open'])} open", (0xFE,0xE2,0xE2), (0xFC,0xA5,0xA5))]
+    for i, (v, l, s, bg, brd) in enumerate(cards):
+        pdf.kpi(10+i*48, pdf.get_y(), 46, 16, v, l, s, bg, brd)
     pdf.ln(20)
-
-    # ── Executive Summary ────────────────────────────────────────────
-    pdf.section_title('Executive Summary')
-    for insight in report['insights']:
-        pdf.body_text(f'- {insight}', size=8, color=(0x47, 0x55, 0x69))
-
-    # ── Status ───────────────────────────────────────────────────────
-    pdf.sub_title('Status Breakdown')
-    status_rows = []
-    for s, c in report['status_entries']:
-        share = round(c / max(1, report['shipments']) * 100)
-        comment = 'Closed' if s.lower() == 'delivered' else ('Moving' if 'transit' in s.lower() else 'Monitor')
-        status_rows.append([s, fmt_num(c), f'{share}%', comment])
-    pdf.data_table(['Status', 'Count', 'Share', 'Comment'], status_rows)
-    pdf.ln(4)
-
-    # ── Aging ────────────────────────────────────────────────────────
-    pdf.sub_title('Open Aging')
-    aging_rows = []
-    for label, val in sorted(report['aging'].items()):
-        note = 'Escalate' if label == '9d+' else ('Watchlist' if label == '6-8d' else 'Follow-up')
-        aging_rows.append([label, fmt_num(val), note])
-    pdf.data_table(['Aging', 'Count', 'Interpretation'], aging_rows)
-    pdf.ln(4)
-
-    # ── Lanes ────────────────────────────────────────────────────────
-    pdf.sub_title('Top Lanes')
-    lane_rows = []
-    for lane, count in report['lane_entries'][:6]:
-        lane_recs = [r for r in report['records'] if f"{r['origin']} -> {r['dest']}" == lane]
-        lane_del = sum(1 for r in lane_recs if r['is_delivered'])
-        rate = round(lane_del / count * 100) if count else 0
-        lane_rows.append([lane[:50], fmt_num(count), fmt_num(lane_del), fmt_num(count - lane_del), f'{rate}%'])
-    pdf.data_table(['Lane', 'Shipments', 'Delivered', 'Open', 'Rate'], lane_rows)
-    pdf.ln(4)
-
-    # ── Exceptions ───────────────────────────────────────────────────
-    pdf.sub_title('Priority Exceptions')
-    now = datetime.now()
-    exc_rows = []
+    pdf.section('Executive Summary')
+    for ins in report['insights']: pdf.body(f'- {ins}', 8, (0x47,0x55,0x69))
+    pdf.sub('Status Breakdown')
+    pdf.table(['Status', 'Count', 'Share', 'Comment'],
+              [[s, fmt_num(c), f"{round(c/max(1,report['shipments'])*100)}%",
+                'Closed' if s.lower()=='delivered' else ('Moving' if 'transit' in s.lower() else 'Monitor')]
+               for s, c in report['status_entries']]); pdf.ln(4)
+    pdf.sub('Open Aging')
+    pdf.table(['Aging', 'Count', 'Interpretation'],
+              [[lb, fmt_num(vl), 'Escalate' if lb=='9d+' else ('Watchlist' if lb=='6-8d' else 'Follow-up')]
+               for lb, vl in sorted(report['aging'].items())]); pdf.ln(4)
+    pdf.sub('Top Lanes')
+    pdf.table(['Lane', 'Shipments', 'Delivered', 'Open', 'Rate'],
+              [[l[:50], fmt_num(c), '--', '--', '--'] for l, c in report['lane_entries'][:6]]); pdf.ln(4)
+    now = datetime.now(); exc = []
     for r in report['priority_records'][:8]:
-        is_delayed = not r['is_delivered'] and r['promise'] and r['promise'] < now
-        if not r['is_delivered'] or is_delayed:
-            status_label = 'Delayed' if is_delayed else ('Delivered' if r['is_delivered'] else 'Open')
-            action = 'Expedite / confirm ETA' if is_delayed else ('Review late reason' if r['is_delivered'] else 'Track')
-            exc_rows.append([r['id'][:22], f"{r['dest']}, {r['state']}"[:28], status_label,
-                             fmt_date(r['promise']), fmt_date(r['last_scan']), fmt_money(r['amount']), action])
-    if exc_rows:
-        pdf.data_table(['Order', 'Destination', 'Status', 'Promise', 'Last Scan', 'Amount', 'Action'],
-                       exc_rows, col_widths=[28, 28, 18, 24, 24, 22, 22], header_bg=(0x8B, 0x00, 0x00))
+        d = not r['is_delivered'] and r['promise'] and r['promise'] < now
+        if not r['is_delivered'] or d:
+            exc.append([r['id'][:22], f"{r['dest']}, {r['state']}"[:28], 'Delayed' if d else ('Delivered' if r['is_delivered'] else 'Open'),
+                        fmt_date(r['promise']), fmt_date(r['last_scan']), fmt_money(r['amount']),
+                        'Expedite' if d else ('Review' if r['is_delivered'] else 'Track')])
+    if exc:
+        pdf.sub('Priority Exceptions')
+        pdf.table(['Order', 'Destination', 'Status', 'Promise', 'Last Scan', 'Amount', 'Action'], exc,
+                  cw=[28,28,18,24,24,22,22], hbg=(0x8B,0x00,0x00))
+    buf = io.BytesIO(); pdf.output(buf); return buf.getvalue()
 
-    buf = io.BytesIO()
-    pdf.output(buf)
-    return buf.getvalue()
-
-
-# ── Entry point ────────────────────────────────────────────────────────
+# ── App start ────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=os.environ.get('FLASK_DEBUG', '0') == '1')

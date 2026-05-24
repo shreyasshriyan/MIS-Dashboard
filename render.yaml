@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: logistics-dashboard
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    envVars:
+      - key: RENDER_USERNAME
+        value: admin
+      - key: RENDER_PASSWORD
+        sync: false  # set this manually in Render dashboard
