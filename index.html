@@ -1,0 +1,2666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Multi-Customer Logistics Dashboard</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --card: #ffffff;
+      --line: #dbe5ef;
+      --text: #111827;
+      --muted: #64748b;
+      --blue: #2563eb;
+      --green: #059669;
+      --amber: #d97706;
+      --red: #dc2626;
+      --teal: #0f766e;
+      --ink: #0f172a;
+      --shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+
+    button, select, input { font: inherit; }
+
+    button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 40px;
+      padding: 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink);
+      cursor: pointer;
+    }
+
+    button:hover { border-color: #aebfd1; }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+    button svg { width: 17px; height: 17px; }
+
+    .download-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      padding: 0 14px;
+      border: 1px solid #a7f3d0;
+      border-radius: 8px;
+      background: #d1fae5;
+      color: #047857;
+      font-size: 13px;
+      font-weight: 800;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+    .ghost { background: #f8fafc; }
+    .icon-only { width: 40px; padding: 0; }
+    .hidden { display: none !important; }
+
+    .shell {
+      width: min(1460px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 22px 0 34px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .eyebrow {
+      margin: 0 0 4px;
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 850;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3, p { margin: 0; }
+    h1 { font-size: 28px; line-height: 1.1; letter-spacing: 0; }
+
+    .meta {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      padding: 0 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 750;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .upload-row {
+      display: grid;
+      grid-template-columns: minmax(260px, 0.8fr) minmax(560px, 1.8fr);
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+
+    .drop-zone {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      min-height: 88px;
+      padding: 16px;
+      border: 1px dashed #9fb4ca;
+      border-radius: 8px;
+      background: var(--card);
+      box-shadow: var(--shadow);
+      cursor: pointer;
+    }
+
+    .drop-zone.dragging {
+      border-color: var(--blue);
+      background: #eff6ff;
+    }
+
+    .drop-icon {
+      display: grid;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      flex: 0 0 44px;
+      border-radius: 8px;
+      background: #dbeafe;
+      color: var(--blue);
+    }
+
+    .drop-icon svg { width: 23px; height: 23px; }
+    .drop-zone strong { display: block; font-size: 15px; }
+    .drop-zone span span { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.35; }
+
+    .datasets-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+      padding: 10px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--card);
+      box-shadow: var(--shadow);
+    }
+
+    .datasets-bar .label {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 850;
+      text-transform: uppercase;
+      margin-right: 4px;
+    }
+
+    .dataset-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 120ms;
+    }
+
+    .dataset-chip:hover { border-color: var(--blue); }
+    .dataset-chip.active {
+      background: var(--blue);
+      border-color: var(--blue);
+      color: #fff;
+    }
+
+    .dataset-chip .remove {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      font-size: 11px;
+      line-height: 1;
+      cursor: pointer;
+      opacity: 0.5;
+    }
+
+    .dataset-chip .remove:hover { opacity: 1; }
+    .dataset-chip.active .remove { color: #fff; }
+
+    .filters {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      align-items: end;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--card);
+      box-shadow: var(--shadow);
+    }
+
+    label.filter-label {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 850;
+      text-transform: uppercase;
+    }
+
+    select {
+      width: 100%;
+      min-height: 40px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink);
+      padding: 0 10px;
+    }
+
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--card);
+      box-shadow: var(--shadow);
+    }
+
+    .kpi {
+      min-height: 112px;
+      padding: 14px;
+      overflow: hidden;
+    }
+
+    .kpi.blue { border-top: 3px solid var(--blue); }
+    .kpi.green { border-top: 3px solid var(--green); }
+    .kpi.amber { border-top: 3px solid var(--amber); }
+    .kpi.red { border-top: 3px solid var(--red); }
+
+    .kpi-label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 850;
+      text-transform: uppercase;
+    }
+
+    .kpi-value {
+      margin-top: 10px;
+      color: var(--ink);
+      font-size: 27px;
+      line-height: 1;
+      font-weight: 900;
+      overflow-wrap: anywhere;
+    }
+
+    .kpi-sub {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.18fr) minmax(360px, 0.82fr);
+      gap: 14px;
+    }
+
+    .charts {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .panel {
+      padding: 14px;
+      min-width: 0;
+    }
+
+    .panel-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .panel h2 { font-size: 15px; line-height: 1.2; }
+    .note { color: var(--muted); font-size: 12px; }
+
+    canvas {
+      width: 100%;
+      height: 270px;
+      display: block;
+    }
+
+    #statusCanvas {
+      height: 340px;
+    }
+
+    .side { display: grid; gap: 14px; }
+
+    .lane-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 9px 0;
+      border-bottom: 1px solid #e8eef5;
+    }
+
+    .lane-row:last-child { border-bottom: 0; }
+    .lane-name { font-size: 12px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lane-meta { margin-top: 3px; color: var(--muted); font-size: 11px; }
+    .lane-count { color: var(--blue); font-size: 17px; font-weight: 900; }
+
+    .table-wrap {
+      overflow: auto;
+      max-height: 430px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    table {
+      width: 100%;
+      min-width: 650px;
+      border-collapse: collapse;
+      background: #fff;
+    }
+
+    th, td {
+      padding: 10px 11px;
+      border-bottom: 1px solid #e8eef5;
+      text-align: left;
+      vertical-align: middle;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      background: #eef5fb;
+      color: #334155;
+      font-size: 11px;
+      text-transform: uppercase;
+      z-index: 1;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      border-radius: 999px;
+      padding: 0 9px;
+      font-size: 11px;
+      font-weight: 850;
+    }
+
+    .badge.delivered { background: #d1fae5; color: #047857; }
+    .badge.transit { background: #dbeafe; color: #1d4ed8; }
+    .badge.pending { background: #fef3c7; color: #92400e; }
+    .badge.delayed { background: #fee2e2; color: #991b1b; }
+
+    .empty {
+      display: grid;
+      place-items: center;
+      min-height: 260px;
+      margin-top: 14px;
+      border: 1px dashed #a8bbce;
+      border-radius: 8px;
+      background: #fff;
+      color: var(--muted);
+      text-align: center;
+      padding: 26px;
+    }
+
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      max-width: min(440px, calc(100vw - 36px));
+      padding: 12px 14px;
+      border-radius: 8px;
+      background: var(--ink);
+      color: #fff;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.25);
+      font-size: 13px;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(8px);
+      transition: opacity 150ms ease, transform 150ms ease;
+      z-index: 10;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .progress-overlay {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: rgba(15, 23, 42, 0.45);
+      z-index: 20;
+    }
+
+    .progress-card {
+      max-width: 420px;
+      width: calc(100% - 32px);
+      padding: 24px;
+      border-radius: 12px;
+      background: #fff;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(15, 23, 42, 0.3);
+    }
+
+    .progress-card h3 {
+      font-size: 17px;
+      margin-bottom: 8px;
+    }
+
+    .progress-card p {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 16px;
+    }
+
+    .progress-track {
+      height: 6px;
+      border-radius: 3px;
+      background: #e8eef5;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 3px;
+      background: var(--blue);
+      transition: width 200ms ease;
+    }
+
+    @media (max-width: 1180px) {
+      .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .main-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 860px) {
+      .shell { width: min(100% - 20px, 760px); padding-top: 14px; }
+      .topbar { flex-direction: column; }
+      .actions { justify-content: flex-start; }
+      .upload-row, .filters, .charts, .kpis { grid-template-columns: 1fr; }
+      h1 { font-size: 24px; }
+      canvas { height: 260px; }
+      #statusCanvas { height: 360px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Multi-customer logistics</p>
+        <h1>Logistics dashboard</h1>
+        <div class="meta">
+          <span id="periodLabel">Awaiting CSV</span>
+          <span class="pill" id="countPill">0 shipments</span>
+          <span class="pill" id="sourcePill">No files loaded</span>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="ghost" id="sampleBtn" type="button" title="Load sample sonic_b2b.csv">
+          <i data-lucide="database"></i><span>Load sample</span>
+        </button>
+        <button class="ghost icon-only" id="resetBtn" type="button" title="Reset filters">
+          <i data-lucide="rotate-ccw"></i>
+        </button>
+        <button class="primary" id="pptBtn" type="button" title="Create PPT reports for all customers">
+          <i data-lucide="presentation"></i><span>PPTs</span>
+        </button>
+        <button class="primary" id="wordBtn" type="button" title="Create Word reports for all customers" style="background:#1e3a5f;border-color:#1e3a5f;">
+          <i data-lucide="file-text"></i><span>Word</span>
+        </button>
+        <button class="primary" id="pdfBtn" type="button" title="Create PDF reports for all customers" style="background:#991b1b;border-color:#991b1b;">
+          <i data-lucide="file"></i><span>PDF</span>
+        </button>
+        <a class="download-link hidden" id="pptLink" href="#" download>Download</a>
+      </div>
+    </header>
+
+    <section class="upload-row">
+      <label class="drop-zone" id="dropZone" for="csvInput">
+        <span class="drop-icon"><i data-lucide="upload-cloud"></i></span>
+        <span>
+          <strong>Drop CSV files or browse</strong>
+          <span>Upload multiple customer CSV files. Supports sonic_b2b and Customer MIS formats.</span>
+        </span>
+        <input class="hidden" id="csvInput" type="file" accept=".csv,text/csv" multiple>
+      </label>
+
+      <div class="filters">
+        <div>
+          <label class="filter-label" for="periodFilter">Period</label>
+          <select id="periodFilter"></select>
+        </div>
+        <div>
+          <label class="filter-label" for="warehouseFilter">Warehouse</label>
+          <select id="warehouseFilter"></select>
+        </div>
+        <div>
+          <label class="filter-label" for="stateFilter">State</label>
+          <select id="stateFilter"></select>
+        </div>
+        <div>
+          <label class="filter-label" for="statusFilter">Status</label>
+          <select id="statusFilter">
+            <option value="all">All statuses</option>
+            <option value="delivered">Delivered</option>
+            <option value="in_transit">In transit</option>
+            <option value="delayed">Delayed</option>
+            <option value="pending">Pending</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section id="datasetsBar" class="datasets-bar hidden">
+      <span class="label">Datasets:</span>
+      <div id="datasetsList"></div>
+    </section>
+
+    <main id="dashboard" class="hidden">
+      <section class="kpis">
+        <article class="card kpi blue">
+          <div class="kpi-label">Shipments</div>
+          <div class="kpi-value" id="shipmentsMetric">0</div>
+          <div class="kpi-sub" id="shipmentsSub">No records</div>
+        </article>
+        <article class="card kpi green">
+          <div class="kpi-label">Delivered rate</div>
+          <div class="kpi-value" id="deliveredMetric">0%</div>
+          <div class="kpi-sub" id="deliveredSub">0 delivered</div>
+        </article>
+        <article class="card kpi red">
+          <div class="kpi-label">Open delayed</div>
+          <div class="kpi-value" id="delayedMetric">0</div>
+          <div class="kpi-sub" id="delayedSub">0 late delivered</div>
+        </article>
+        <article class="card kpi amber">
+          <div class="kpi-label">Package value</div>
+          <div class="kpi-value" id="valueMetric">0</div>
+          <div class="kpi-sub" id="valueSub">Invoice value</div>
+        </article>
+        <article class="card kpi blue">
+          <div class="kpi-label">Boxes</div>
+          <div class="kpi-value" id="boxesMetric">0</div>
+          <div class="kpi-sub" id="boxesSub">0 kg</div>
+        </article>
+        <article class="card kpi green">
+          <div class="kpi-label">Avg delivery TAT</div>
+          <div class="kpi-value" id="tatMetric">0d</div>
+          <div class="kpi-sub" id="tatSub">Pickup to delivery</div>
+        </article>
+      </section>
+
+      <section class="main-grid">
+        <div class="charts">
+          <article class="card panel">
+            <div class="panel-head">
+              <div><h2>Shipment status</h2><p class="note" id="statusNote">Current status split</p></div>
+            </div>
+            <canvas id="statusCanvas"></canvas>
+          </article>
+          <article class="card panel">
+            <div class="panel-head">
+              <div><h2>Manifest trend</h2><p class="note">Daily shipment volume</p></div>
+            </div>
+            <canvas id="trendCanvas"></canvas>
+          </article>
+          <article class="card panel">
+            <div class="panel-head">
+              <div><h2>Top destination states</h2><p class="note">Shipment count by state</p></div>
+            </div>
+            <canvas id="stateCanvas"></canvas>
+          </article>
+          <article class="card panel">
+            <div class="panel-head">
+              <div><h2>Open shipment aging</h2><p class="note" id="agingNote">Based on pickup date</p></div>
+            </div>
+            <canvas id="agingCanvas"></canvas>
+          </article>
+        </div>
+
+        <div class="side">
+          <article class="card panel">
+            <div class="panel-head">
+              <div><h2>Top lanes</h2><p class="note">Origin to destination</p></div>
+            </div>
+            <div id="laneList"></div>
+          </article>
+          <article class="card panel">
+            <div class="panel-head">
+              <div><h2>Priority shipments</h2><p class="note" id="priorityNote">Open and delayed items first</p></div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Order</th>
+                    <th>Destination</th>
+                    <th>Status</th>
+                    <th>Promise</th>
+                    <th>Last scan</th>
+                    <th>Amount</th>
+                  </tr>
+                </thead>
+                <tbody id="priorityBody"></tbody>
+              </table>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <section id="emptyState" class="empty">
+      <div>
+        <strong>No logistics CSVs loaded yet.</strong>
+        <p style="margin-top:8px;">Drop one or more CSV files or click to browse. Supports <strong>sonic_b2b</strong> and <strong>Customer MIS</strong> formats.</p>
+      </div>
+    </section>
+  </div>
+
+  <div id="toast" class="toast"></div>
+  <div id="progressOverlay" class="progress-overlay hidden">
+    <div class="progress-card">
+      <h3>Generating PPTs...</h3>
+      <p id="progressLabel">Preparing reports for each customer dataset.</p>
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="vendor/pptxgen.bundle.js?v=2"></script>
+  <script src="vendor/jszip.min.js?v=1"></script>
+  <script src="vendor/lucide.min.js?v=2"></script>
+  <script src="vendor/docx.min.js?v=1"></script>
+  <script src="vendor/jspdf.umd.min.js?v=1"></script>
+  <script src="vendor/html2canvas.min.js?v=1"></script>
+  <script>
+    const COLORS = {
+      blue: '#2563eb',
+      green: '#059669',
+      amber: '#d97706',
+      red: '#dc2626',
+      purple: '#7c3aed',
+      teal: '#0f766e',
+      gray: '#64748b',
+      ink: '#0f172a'
+    };
+
+    const SCHEMA_SONIC_B2B = 'sonic_b2b';
+    const SCHEMA_CUSTOMER_MIS = 'customer_mis';
+
+    const SCHEMA_PROFILES = {
+      [SCHEMA_SONIC_B2B]: {
+        detect: header => header.includes('Order id'),
+        fields: {
+          id: 'Order id',
+          lrn: 'LRN',
+          boxes: 'No of boxes',
+          client: 'Client',
+          manifest: 'Manifest Date',
+          pickup: 'Pickup Date',
+          expected: 'Expected Date',
+          promise: 'Promise Date',
+          delivered: 'Delivered Date',
+          origin: 'Origin City',
+          destination: 'Destination City',
+          warehouse: 'Client Location/warehouse',
+          status: 'Current Status',
+          statusType: 'Status Type',
+          remarks: 'Remarks',
+          amount: 'Package Amount',
+          weight: 'Weight',
+          attempts: 'Attempt Count',
+          lastScan: 'Last Scan Date',
+          lastScanLocation: 'Last Scan Location',
+          zone: 'Invoice Zone',
+          state: 'State'
+        }
+      },
+      [SCHEMA_CUSTOMER_MIS]: {
+        detect: header => header.includes('Reference Number') && header.includes('Customer Code'),
+        fields: {
+          id: 'Reference Number',
+          lrn: 'Reference Number',
+          boxes: 'Num Pieces',
+          client: 'Customer Code',
+          manifest: 'Created at',
+          pickup: 'Last Pickup Completed Time',
+          expected: 'Expected Delivery Date',
+          promise: 'Expected Delivery Date',
+          delivered: 'Delivered Time',
+          origin: 'Sender City',
+          destination: 'Consignee City',
+          warehouse: 'Origin Hub Name',
+          status: 'Status',
+          statusType: 'Status',
+          remarks: 'Delivery Failure Reason',
+          amount: 'Declared Value',
+          weight: 'Weight',
+          attempts: null,
+          lastScan: null,
+          lastScanLocation: 'Destination Hub Name',
+          zone: null,
+          state: 'Consignee City'
+        }
+      }
+    };
+
+    const BACKEND_URL = window.location.origin + '/api/generate';
+
+    const app = {
+      datasets: [],
+      activeIndex: -1,
+      records: [],
+      filtered: [],
+      source: '',
+      uploadedFiles: [],
+      asOf: new Date(),
+      filters: { period: 'all', warehouse: 'all', state: 'all', status: 'all' }
+    };
+
+    const $ = id => document.getElementById(id);
+    const dom = {
+      dashboard: $('dashboard'),
+      emptyState: $('emptyState'),
+      periodLabel: $('periodLabel'),
+      countPill: $('countPill'),
+      sourcePill: $('sourcePill'),
+      csvInput: $('csvInput'),
+      dropZone: $('dropZone'),
+      sampleBtn: $('sampleBtn'),
+      resetBtn: $('resetBtn'),
+      pptBtn: $('pptBtn'),
+      wordBtn: $('wordBtn'),
+      pdfBtn: $('pdfBtn'),
+      pptLink: $('pptLink'),
+      periodFilter: $('periodFilter'),
+      warehouseFilter: $('warehouseFilter'),
+      stateFilter: $('stateFilter'),
+      statusFilter: $('statusFilter'),
+      laneList: $('laneList'),
+      priorityBody: $('priorityBody'),
+      toast: $('toast'),
+      datasetsBar: $('datasetsBar'),
+      datasetsList: $('datasetsList'),
+      progressOverlay: $('progressOverlay'),
+      progressLabel: $('progressLabel'),
+      progressFill: $('progressFill')
+    };
+
+    const numberFmt = new Intl.NumberFormat('en-IN');
+    const moneyFmt = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 });
+    const decimalFmt = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 1 });
+    const dateFmt = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    const shortDateFmt = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short' });
+    const monthFmt = new Intl.DateTimeFormat('en-IN', { month: 'short', year: 'numeric' });
+    const DAY = 24 * 60 * 60 * 1000;
+
+    document.addEventListener('DOMContentLoaded', init);
+
+    function init() {
+      bindEvents();
+      setBaseFilterOptions();
+      drawEmptyCharts();
+      createIcons();
+      loadSample(false);
+    }
+
+    function bindEvents() {
+      dom.csvInput.addEventListener('change', event => {
+        const files = Array.from(event.target.files || []);
+        if (files.length) readFiles(files);
+        event.target.value = '';
+      });
+
+      ['dragenter', 'dragover'].forEach(type => {
+        dom.dropZone.addEventListener(type, event => {
+          event.preventDefault();
+          dom.dropZone.classList.add('dragging');
+        });
+      });
+
+      ['dragleave', 'drop'].forEach(type => {
+        dom.dropZone.addEventListener(type, event => {
+          event.preventDefault();
+          dom.dropZone.classList.remove('dragging');
+        });
+      });
+
+      dom.dropZone.addEventListener('drop', event => {
+        const files = Array.from(event.dataTransfer.files || []);
+        if (files.length) readFiles(files);
+      });
+
+      dom.sampleBtn.addEventListener('click', () => loadSample(true));
+      dom.resetBtn.addEventListener('click', resetFilters);
+      dom.pptBtn.addEventListener('click', () => createAllReports('ppt'));
+      dom.wordBtn.addEventListener('click', () => createAllReports('word'));
+      dom.pdfBtn.addEventListener('click', () => createAllReports('pdf'));
+
+      [dom.periodFilter, dom.warehouseFilter, dom.stateFilter, dom.statusFilter].forEach(select => {
+        select.addEventListener('change', () => {
+          app.filters.period = dom.periodFilter.value;
+          app.filters.warehouse = dom.warehouseFilter.value;
+          app.filters.state = dom.stateFilter.value;
+          app.filters.status = dom.statusFilter.value;
+          applyFilters();
+        });
+      });
+
+      window.addEventListener('resize', debounce(() => {
+        if (app.filtered.length) renderCharts(buildAggregates(app.filtered));
+      }, 160));
+    }
+
+    function detectSchema(header) {
+      for (const [key, profile] of Object.entries(SCHEMA_PROFILES)) {
+        if (profile.detect(header)) return key;
+      }
+      const lower = header.map(h => h.toLowerCase());
+      if (lower.some(h => h.includes('order id') || h.includes('order'))) return SCHEMA_SONIC_B2B;
+      if (lower.some(h => h.includes('reference number'))) return SCHEMA_CUSTOMER_MIS;
+      return SCHEMA_SONIC_B2B;
+    }
+
+    function readFiles(files) {
+      const csvFiles = files.filter(f => f.name.toLowerCase().endsWith('.csv') || f.type === 'text/csv');
+      if (!csvFiles.length) {
+        showToast('No CSV files found.');
+        return;
+      }
+
+      app.uploadedFiles = csvFiles;
+
+      let completed = 0;
+      const total = csvFiles.length;
+      let loadedCount = 0;
+
+      csvFiles.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const ds = loadCsv(String(reader.result || ''), file.name);
+          if (ds) loadedCount += 1;
+          completed += 1;
+          if (completed >= total) {
+            renderDatasetsBar();
+            if (app.activeIndex < 0 && app.datasets.length) switchToDataset(app.datasets.length - 1);
+            showToast(`Loaded ${numberFmt.format(loadedCount)} file(s).`);
+          }
+        };
+        reader.onerror = () => {
+          showToast(`Could not read ${file.name}`);
+          completed += 1;
+        };
+        reader.readAsText(file);
+      });
+    }
+
+    async function loadSample(announce) {
+      try {
+        const res = await fetch('sonic_b2b.csv', { cache: 'no-store' });
+        if (!res.ok) throw new Error('Sample unavailable');
+        const text = await res.text();
+        const ds = loadCsv(text, 'sonic_b2b.csv');
+        if (ds) {
+          renderDatasetsBar();
+          switchToDataset(app.datasets.indexOf(ds));
+          if (announce) showToast('Loaded sonic_b2b.csv.');
+        } else if (announce) {
+          showToast('No data in sample CSV.');
+        }
+      } catch (error) {
+        if (announce) showToast('Sample CSV was not found.');
+      }
+    }
+
+    function loadCsv(text, source) {
+      const rows = parseCsv(text);
+      if (!rows.length) {
+        showToast(`No data found in ${source}.`);
+        return null;
+      }
+
+      const header = Object.keys(rows[0]);
+      const schema = detectSchema(header);
+      const fields = SCHEMA_PROFILES[schema].fields;
+
+      const records = rows
+        .map((row, index) => normalizeRecord(row, index, fields, schema))
+        .filter(record => record.id);
+
+      if (!records.length) {
+        showToast(`No shipment rows found in ${source}.`);
+        return null;
+      }
+
+      const clientName = extractClientName(records, source, schema);
+      const dataset = {
+        source,
+        schema,
+        client: clientName,
+        records
+      };
+
+      app.datasets.push(dataset);
+      return dataset;
+    }
+
+    function extractClientName(records, source, schema) {
+      if (schema === SCHEMA_CUSTOMER_MIS) {
+        const codes = new Set(records.map(r => r.client).filter(Boolean));
+        if (codes.size === 1) {
+          const code = [...codes][0];
+          return `Customer ${code} (MIS)`;
+        }
+        if (codes.size > 1) {
+          return `${[...codes].slice(0, 2).join(', ')} (MIS)`;
+        }
+      }
+      const clients = new Set(records.filter(r => r.client && r.client !== 'Customer').map(r => r.client));
+      if (clients.size === 1) return [...clients][0];
+      if (clients.size > 0) return [...clients][0];
+      const base = source.replace(/\.csv$/i, '').replace(/[_-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      return base;
+    }
+
+    function normalizeRecord(row, index, fields, schema) {
+      const get = key => {
+        const col = fields[key];
+        if (!col) return '';
+        return cleanCell(row[col] !== undefined ? row[col] : '');
+      };
+
+      const rawStatus = get('status');
+      const rawStatusType = get('statusType');
+      const deliveredDate = parseDate(get('delivered'));
+
+      let origin = get('origin');
+      let destination = get('destination');
+      let state = get('state');
+      let zone = get('zone');
+
+      if (schema === SCHEMA_CUSTOMER_MIS) {
+        state = guessStateFromCity(destination);
+        zone = '';
+      }
+
+      return {
+        row,
+        index,
+        id: get('id') || get('lrn') || `Row ${index + 1}`,
+        lrn: get('lrn'),
+        client: titleCase(get('client')) || 'Customer',
+        boxes: parseNumber(get('boxes')),
+        warehouse: titleCase(get('warehouse')) || 'Unassigned',
+        manifestDate: parseDate(get('manifest')),
+        pickupDate: parseDate(get('pickup')),
+        expectedDate: parseDate(get('expected')),
+        promiseDate: parseDate(get('promise')) || parseDate(get('expected')),
+        deliveredDate,
+        lastScanDate: parseDate(get('lastScan')),
+        lastScanLocation: get('lastScanLocation'),
+        origin: titleCase(origin) || 'Unknown',
+        destination: titleCase(destination) || 'Unknown',
+        state: titleCase(state) || 'Unknown',
+        zone: zone || 'NA',
+        status: rawStatus,
+        statusType: rawStatusType || rawStatus,
+        remarks: get('remarks'),
+        amount: parseNumber(get('amount')),
+        weight: parseNumber(get('weight')),
+        attempts: parseNumber(get('attempts')),
+        isDelivered: isDeliveredStatus(rawStatus) || isDeliveredStatus(rawStatusType) || Boolean(deliveredDate)
+      };
+    }
+
+    function guessStateFromCity(city) {
+      const stateMap = {
+        'bengaluru': 'Karnataka', 'bangalore': 'Karnataka',
+        'mumbai': 'Maharashtra', 'pune': 'Maharashtra', 'nagpur': 'Maharashtra', 'thane': 'Maharashtra',
+        'delhi': 'Delhi', 'new delhi': 'Delhi',
+        'hyderabad': 'Telangana',
+        'chennai': 'Tamil Nadu',
+        'kolkata': 'West Bengal',
+        'ahmedabad': 'Gujarat',
+        'jaipur': 'Rajasthan',
+        'lucknow': 'Uttar Pradesh',
+        'chandigarh': 'Chandigarh'
+      };
+      const key = (city || '').toLowerCase().trim();
+      for (const [k, v] of Object.entries(stateMap)) {
+        if (key.includes(k)) return v;
+      }
+      return city || 'Unknown';
+    }
+
+    const MERGED_INDEX = -2;
+
+    function getMergedRecords() {
+      const all = [];
+      app.datasets.forEach((ds, idx) => {
+        ds.records.forEach(r => {
+          all.push(Object.assign({}, r, { _datasetIndex: idx, _datasetLabel: ds.client }));
+        });
+      });
+      return all;
+    }
+
+    function renderDatasetsBar() {
+      if (!app.datasets.length) {
+        dom.datasetsBar.classList.add('hidden');
+        return;
+      }
+      dom.datasetsBar.classList.remove('hidden');
+      const chips = [];
+
+      if (app.datasets.length >= 2) {
+        const active = app.activeIndex === MERGED_INDEX ? 'active' : '';
+        chips.push(`<span class="dataset-chip merged-chip ${active}" data-index="${MERGED_INDEX}">
+          <i data-lucide="layers" style="width:14px;height:14px"></i>
+          <span>All (Merged)</span>
+        </span>`);
+      }
+
+      app.datasets.forEach((ds, index) => {
+        const active = index === app.activeIndex ? 'active' : '';
+        chips.push(`<span class="dataset-chip ${active}" data-index="${index}">
+          <span>${escapeHtml(ds.client)}</span>
+          <span class="remove" data-remove="${index}">&times;</span>
+        </span>`);
+      });
+
+      dom.datasetsList.innerHTML = chips.join('');
+
+      dom.datasetsList.querySelectorAll('.dataset-chip[data-index]').forEach(chip => {
+        chip.addEventListener('click', event => {
+          if (event.target.dataset.remove !== undefined) {
+            removeDataset(Number(event.target.dataset.remove));
+            return;
+          }
+          switchToDataset(Number(chip.dataset.index));
+        });
+      });
+      createIcons();
+    }
+
+    function switchToDataset(index) {
+      if (index === MERGED_INDEX) {
+        app.activeIndex = MERGED_INDEX;
+        const merged = getMergedRecords();
+        app.records = merged;
+        app.filtered = merged;
+        app.source = `${app.datasets.length} merged files`;
+        app.asOf = getAsOfDate(merged);
+        app.filters = { period: 'all', warehouse: 'all', state: 'all', status: 'all' };
+        hydrateFilters();
+        applyFilters();
+        renderDatasetsBar();
+        return;
+      }
+      if (index < 0 || index >= app.datasets.length) {
+        app.activeIndex = -1;
+        app.records = [];
+        app.filtered = [];
+        render();
+        return;
+      }
+      app.activeIndex = index;
+      const ds = app.datasets[index];
+      app.records = ds.records;
+      app.filtered = ds.records;
+      app.source = ds.source;
+      app.asOf = getAsOfDate(ds.records);
+      app.filters = { period: 'all', warehouse: 'all', state: 'all', status: 'all' };
+      hydrateFilters();
+      applyFilters();
+      renderDatasetsBar();
+    }
+
+    function removeDataset(index) {
+      app.datasets.splice(index, 1);
+      if (app.activeIndex >= app.datasets.length) app.activeIndex = app.datasets.length - 1;
+      else if (app.activeIndex === MERGED_INDEX && app.datasets.length < 2) app.activeIndex = app.datasets.length - 1;
+      if (app.datasets.length) {
+        switchToDataset(Math.max(0, app.activeIndex));
+      } else {
+        app.activeIndex = -1;
+        app.records = [];
+        app.filtered = [];
+        renderDatasetsBar();
+        dom.dashboard.classList.add('hidden');
+        dom.emptyState.classList.remove('hidden');
+        dom.pptBtn.disabled = true;
+      }
+    }
+
+    function parseCsv(text) {
+      const clean = String(text || '').replace(/^\uFEFF/, '');
+      const rows = [];
+      let row = [];
+      let value = '';
+      let quoted = false;
+      for (let i = 0; i < clean.length; i += 1) {
+        const char = clean[i];
+        const next = clean[i + 1];
+        if (quoted) {
+          if (char === '"' && next === '"') {
+            value += '"';
+            i += 1;
+          } else if (char === '"') {
+            quoted = false;
+          } else {
+            value += char;
+          }
+        } else if (char === '"') {
+          quoted = true;
+        } else if (char === ',') {
+          row.push(value);
+          value = '';
+        } else if (char === '\n') {
+          row.push(value);
+          rows.push(row);
+          row = [];
+          value = '';
+        } else if (char !== '\r') {
+          value += char;
+        }
+      }
+      if (value.length || row.length) {
+        row.push(value);
+        rows.push(row);
+      }
+
+      const header = (rows.shift() || []).map(cleanCell);
+      return rows
+        .filter(csvRow => csvRow.some(cell => cleanCell(cell)))
+        .map(csvRow => {
+          const obj = {};
+          header.forEach((name, index) => { obj[name] = cleanCell(csvRow[index] || ''); });
+          return obj;
+        });
+    }
+
+    function hydrateFilters() {
+      setSelect(dom.periodFilter, buildMonthOptions(app.records), 'All periods');
+      setSelect(dom.warehouseFilter, uniqueOptions(app.records.map(r => r.warehouse)), 'All warehouses');
+      setSelect(dom.stateFilter, uniqueOptions(app.records.map(r => r.state)), 'All states');
+      dom.statusFilter.value = 'all';
+    }
+
+    function setBaseFilterOptions() {
+      setSelect(dom.periodFilter, [], 'All periods');
+      setSelect(dom.warehouseFilter, [], 'All warehouses');
+      setSelect(dom.stateFilter, [], 'All states');
+    }
+
+    function buildMonthOptions(records) {
+      const months = new Map();
+      records.forEach(record => {
+        const date = record.manifestDate || record.pickupDate || record.deliveredDate;
+        if (!date) return;
+        const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        months.set(value, monthFmt.format(date));
+      });
+      return Array.from(months.entries())
+        .sort((a, b) => b[0].localeCompare(a[0]))
+        .map(([value, label]) => ({ value, label }));
+    }
+
+    function uniqueOptions(values) {
+      return Array.from(new Set(values.filter(Boolean)))
+        .sort((a, b) => a.localeCompare(b))
+        .map(value => ({ value, label: value }));
+    }
+
+    function setSelect(select, options, allLabel) {
+      select.innerHTML = '';
+      select.append(new Option(allLabel, 'all'));
+      options.forEach(option => select.append(new Option(option.label, option.value)));
+    }
+
+    function applyFilters() {
+      app.filtered = app.records.filter(record => {
+        const date = record.manifestDate || record.pickupDate || record.deliveredDate;
+        const period = date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}` : 'unknown';
+        const flags = getFlags(record);
+        const statusMatch =
+          app.filters.status === 'all' ||
+          (app.filters.status === 'delivered' && record.isDelivered) ||
+          (app.filters.status === 'in_transit' && flags.inTransit) ||
+          (app.filters.status === 'pending' && flags.pending) ||
+          (app.filters.status === 'delayed' && (flags.delayedOpen || flags.lateDelivered));
+
+        return statusMatch &&
+          (app.filters.period === 'all' || app.filters.period === period) &&
+          (app.filters.warehouse === 'all' || app.filters.warehouse === record.warehouse) &&
+          (app.filters.state === 'all' || app.filters.state === record.state);
+      });
+      render();
+    }
+
+    function render() {
+      if (!app.records.length) {
+        dom.dashboard.classList.add('hidden');
+        dom.emptyState.classList.remove('hidden');
+        dom.pptBtn.disabled = true;
+        return;
+      }
+
+      dom.dashboard.classList.remove('hidden');
+      dom.emptyState.classList.add('hidden');
+      dom.pptBtn.disabled = !app.datasets.length;
+
+      const summary = buildSummary(app.filtered);
+      const aggregates = buildAggregates(app.filtered);
+
+      dom.periodLabel.textContent = dateRangeLabel(app.filtered) || 'Selected records';
+      dom.countPill.textContent = `${numberFmt.format(summary.shipments)} shipments`;
+      dom.sourcePill.textContent = app.source || 'No file';
+      $('shipmentsMetric').textContent = numberFmt.format(summary.shipments);
+      $('shipmentsSub').textContent = `As of ${formatDate(app.asOf)}`;
+      $('deliveredMetric').textContent = `${summary.deliveredRate}%`;
+      $('deliveredSub').textContent = `${numberFmt.format(summary.delivered)} delivered, ${numberFmt.format(summary.open)} open`;
+      $('delayedMetric').textContent = numberFmt.format(summary.delayedOpen);
+      $('delayedSub').textContent = `${numberFmt.format(summary.lateDelivered)} delivered after promise`;
+      $('valueMetric').textContent = summary.valueLabel;
+      $('valueSub').textContent = `${numberFmt.format(summary.attempted)} attempted shipments`;
+      $('boxesMetric').textContent = numberFmt.format(summary.boxes);
+      $('boxesSub').textContent = `${summary.weightLabel} total weight`;
+      $('tatMetric').textContent = summary.avgTatLabel;
+      $('tatSub').textContent = `${summary.onTimeRate}% on-time delivered`;
+      $('statusNote').textContent = `${numberFmt.format(summary.open)} open shipments`;
+      $('agingNote').textContent = `Aging as of ${formatDate(app.asOf)}`;
+      $('priorityNote').textContent = `${numberFmt.format(summary.delayedOpen)} currently late`;
+
+      renderCharts(aggregates);
+      renderLanes(aggregates.lanes);
+      renderPriority(app.filtered);
+      createIcons();
+    }
+
+    function buildSummary(records) {
+      const shipments = records.length;
+      const delivered = records.filter(r => r.isDelivered).length;
+      const open = shipments - delivered;
+      const flags = records.map(getFlags);
+      const delayedOpen = flags.filter(flag => flag.delayedOpen).length;
+      const lateDelivered = flags.filter(flag => flag.lateDelivered).length;
+      const deliveredWithPromise = records.filter(r => r.isDelivered && r.deliveredDate && r.promiseDate);
+      const onTime = deliveredWithPromise.filter(r => !getFlags(r).lateDelivered).length;
+      const tatRecords = records.filter(r => r.isDelivered && r.deliveredDate && (r.pickupDate || r.manifestDate));
+      const avgTat = tatRecords.length ? sum(tatRecords, r => diffDays(r.pickupDate || r.manifestDate, r.deliveredDate)) / tatRecords.length : 0;
+      const amount = sum(records, r => r.amount);
+      const weight = sum(records, r => r.weight);
+      return {
+        shipments,
+        delivered,
+        open,
+        delayedOpen,
+        lateDelivered,
+        attempted: records.filter(r => r.attempts > 0).length,
+        boxes: Math.round(sum(records, r => r.boxes)),
+        amount,
+        weight,
+        deliveredRate: shipments ? Math.round(delivered / shipments * 100) : 0,
+        onTimeRate: deliveredWithPromise.length ? Math.round(onTime / deliveredWithPromise.length * 100) : 0,
+        avgTat,
+        avgTatLabel: `${decimalFmt.format(avgTat)}d`,
+        valueLabel: formatMoney(amount),
+        weightLabel: `${decimalFmt.format(weight)} kg`
+      };
+    }
+
+    function buildAggregates(records) {
+      return {
+        status: topEntries(countBy(records, r => r.status || 'Unknown'), 6),
+        states: topEntries(countBy(records, r => r.state || 'Unknown'), 8),
+        lanes: topEntries(countBy(records, r => `${r.origin} -> ${r.destination}`), 10),
+        trend: buildTrend(records),
+        aging: buildAging(records)
+      };
+    }
+
+    function buildTrend(records) {
+      const counts = new Map();
+      records.forEach(record => {
+        const date = record.manifestDate || record.pickupDate || record.deliveredDate;
+        if (!date) return;
+        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        counts.set(key, (counts.get(key) || 0) + 1);
+      });
+      return Array.from(counts.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([key, value]) => ({ key, label: shortDateFmt.format(parseDate(key)), value }));
+    }
+
+    function buildAging(records) {
+      const buckets = [
+        { label: '0-2d', value: 0 },
+        { label: '3-5d', value: 0 },
+        { label: '6-8d', value: 0 },
+        { label: '9d+', value: 0 }
+      ];
+      records.filter(r => !r.isDelivered).forEach(record => {
+        const start = record.pickupDate || record.manifestDate || record.lastScanDate;
+        const age = start ? Math.max(0, Math.floor(diffDays(start, app.asOf))) : 0;
+        if (age <= 2) buckets[0].value += 1;
+        else if (age <= 5) buckets[1].value += 1;
+        else if (age <= 8) buckets[2].value += 1;
+        else buckets[3].value += 1;
+      });
+      return buckets;
+    }
+
+    function renderCharts(aggregates) {
+      drawDonut($('statusCanvas'), aggregates.status, [COLORS.green, COLORS.blue, COLORS.amber, COLORS.red, COLORS.purple, COLORS.gray]);
+      drawLine($('trendCanvas'), aggregates.trend, COLORS.blue);
+      drawHorizontalBars($('stateCanvas'), aggregates.states, COLORS.teal);
+      drawVerticalBars($('agingCanvas'), aggregates.aging, COLORS.amber);
+    }
+
+    function drawEmptyCharts() {
+      ['statusCanvas', 'trendCanvas', 'stateCanvas', 'agingCanvas'].forEach(id => drawEmpty(setupCanvas($(id)), 'No data'));
+    }
+
+    function renderLanes(lanes) {
+      if (!lanes.length) {
+        dom.laneList.innerHTML = '<p class="note">No lanes for this selection.</p>';
+        return;
+      }
+      dom.laneList.innerHTML = lanes.slice(0, 8).map(lane => {
+        const parts = lane.label.split(' -> ');
+        return `<div class="lane-row">
+          <div>
+            <div class="lane-name" title="${escapeHtml(lane.label)}">${escapeHtml(parts[0] || 'Unknown')} to ${escapeHtml(parts[1] || 'Unknown')}</div>
+            <div class="lane-meta">${escapeHtml(parts[0] || 'Unknown')} origin</div>
+          </div>
+          <div class="lane-count">${numberFmt.format(lane.value)}</div>
+        </div>`;
+      }).join('');
+    }
+
+    function renderPriority(records) {
+      const rows = priorityRecords(records).slice(0, 14);
+      dom.priorityBody.innerHTML = rows.map(record => {
+        const badge = badgeFor(record);
+        return `<tr>
+          <td title="${escapeHtml(record.id)}">${escapeHtml(truncate(record.id, 24))}</td>
+          <td>${escapeHtml(record.destination)}, ${escapeHtml(record.state)}</td>
+          <td><span class="badge ${badge.className}">${escapeHtml(badge.label)}</span></td>
+          <td>${formatDate(record.promiseDate)}</td>
+          <td>${formatDate(record.lastScanDate)}</td>
+          <td>${formatMoney(record.amount)}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function priorityRecords(records) {
+      return records.slice().sort((a, b) => {
+        const af = getFlags(a);
+        const bf = getFlags(b);
+        const as = af.delayedOpen ? 0 : a.isDelivered ? 3 : 1;
+        const bs = bf.delayedOpen ? 0 : b.isDelivered ? 3 : 1;
+        if (as !== bs) return as - bs;
+        return (a.promiseDate ? a.promiseDate.getTime() : Infinity) - (b.promiseDate ? b.promiseDate.getTime() : Infinity);
+      });
+    }
+
+    async function createAllReports(format) {
+      if (!app.datasets.length) {
+        showToast('Load at least one CSV before creating reports.');
+        return;
+      }
+
+      const Pptx = window.PptxGenJS || window.pptxgen;
+      if (format === 'ppt' && typeof Pptx !== 'function') {
+        showToast('PPT engine did not load. Make sure the vendor folder is hosted with this app.');
+        return;
+      }
+
+      const btn = format === 'ppt' ? dom.pptBtn : format === 'word' ? dom.wordBtn : dom.pdfBtn;
+      btn.disabled = true;
+      dom.progressOverlay.classList.remove('hidden');
+      dom.pptLink.classList.add('hidden');
+
+      try {
+        const usedBackend = await tryGenerateBackend(format);
+        if (!usedBackend) {
+          setProgress(10, 'Backend not available, using client-side generation...');
+          let files;
+          if (format === 'ppt') {
+            files = await buildAllPptReports(Pptx);
+          } else if (format === 'word') {
+            files = await buildAllWordReports();
+          } else {
+            files = await buildAllPdfReports();
+          }
+          downloadReportFiles(files, format);
+        }
+        showToast(`${format.toUpperCase()} report(s) ready.`);
+      } catch (error) {
+        showToast(error && error.message ? error.message : `Could not create ${format.toUpperCase()}s.`);
+      } finally {
+        btn.disabled = false;
+        dom.progressOverlay.classList.add('hidden');
+      }
+    }
+
+    async function tryGenerateBackend(format) {
+      if (!app.uploadedFiles.length) {
+        return false;
+      }
+      try {
+        setProgress(10, 'Connecting to report server...');
+        const formData = new FormData();
+        app.uploadedFiles.forEach(f => formData.append('files', f, f.name));
+        formData.append('format', format);
+
+        const resp = await fetch(BACKEND_URL, { method: 'POST', body: formData });
+        if (!resp.ok) return false;
+
+        const blob = await resp.blob();
+        const extMap = { ppt: 'pptx', word: 'docx', pdf: 'pdf' };
+        const filename = `Logistics_Reports_${safeFile(formatDate(new Date()))}.zip`;
+        triggerDownload(blob, filename);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    function setProgress(percent, label) {
+      dom.progressFill.style.width = `${Math.min(100, Math.max(0, percent))}%`;
+      if (label) dom.progressLabel.textContent = label;
+    }
+
+    function captureChartOffscreen(sourceCanvas, tempCanvas) {
+      const ctx = tempCanvas.getContext('2d');
+      ctx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+      ctx.drawImage(sourceCanvas, 0, 0, tempCanvas.width, tempCanvas.height);
+      return tempCanvas.toDataURL('image/png');
+    }
+
+    function buildReportForDataset(ds) {
+      const summary = buildSummary(ds.records);
+      const aggregates = buildAggregates(ds.records);
+      return {
+        client: ds.client,
+        source: ds.source,
+        period: dateRangeLabel(ds.records) || 'Selected period',
+        generated: `Generated ${formatDate(new Date())}`,
+        summary,
+        aggregates,
+        insights: buildInsights(summary, aggregates),
+        tables: {
+          status: statusTable(ds.records, aggregates.status),
+          aging: agingTable(aggregates.aging),
+          lanes: laneTable(ds.records, aggregates.lanes),
+          exceptions: exceptionTable(ds.records)
+        }
+      };
+    }
+
+    function switchToAndRenderCharts(index, records, source) {
+      app.activeIndex = index;
+      app.records = records;
+      app.filtered = records;
+      app.source = source;
+      app.asOf = getAsOfDate(records);
+      renderCharts(buildAggregates(records));
+    }
+
+    async function buildAllPptReports(Pptx) {
+      const total = app.datasets.length;
+      const previousActive = app.activeIndex;
+      const files = [];
+      const offscreen = document.createElement('canvas');
+      offscreen.width = 620;
+      offscreen.height = 340;
+      offscreen.style.position = 'absolute';
+      offscreen.style.left = '-9999px';
+      document.body.appendChild(offscreen);
+
+      let steps = total;
+      const hasMerge = total >= 2;
+      if (hasMerge) steps += 1;
+
+      for (let i = 0; i < total; i += 1) {
+        const ds = app.datasets[i];
+        setProgress(i / steps * 100, `PPT: ${ds.client}...`);
+        switchToAndRenderCharts(i, ds.records, ds.source);
+        const charts = captureCharts(offscreen);
+        setProgress((i + 0.6) / steps * 100, `Building PPT for ${ds.client}...`);
+        const report = Object.assign(buildReportForDataset(ds), { charts });
+        const buffer = await renderSinglePpt(Pptx, report);
+        const fileName = `${safeFile(report.client)}_${safeFile(report.period)}_Logistics_Report.pptx`;
+        files.push({ name: fileName, buffer });
+        setProgress((i + 1) / steps * 100, `Done: ${ds.client}`);
+      }
+
+      if (hasMerge) {
+        const merged = getMergedRecords();
+        const step = total;
+        setProgress(step / steps * 100, 'PPT: Consolidated report...');
+        switchToAndRenderCharts(MERGED_INDEX, merged, `${total} merged files`);
+        const charts = captureCharts(offscreen);
+        setProgress((step + 0.6) / steps * 100, 'Building consolidated PPT...');
+        const summary = buildSummary(merged);
+        const aggregates = buildAggregates(merged);
+        const report = {
+          client: 'All Customers (Consolidated)',
+          source: `${total} merged files`,
+          period: dateRangeLabel(merged) || 'Selected period',
+          generated: `Generated ${formatDate(new Date())} from ${total} files`,
+          summary, aggregates,
+          insights: buildInsights(summary, aggregates),
+          charts,
+          tables: {
+            status: statusTable(merged, aggregates.status),
+            aging: agingTable(aggregates.aging),
+            lanes: laneTable(merged, aggregates.lanes),
+            exceptions: exceptionTable(merged)
+          }
+        };
+        const buffer = await renderSinglePpt(Pptx, report);
+        files.push({ name: `All_Customers_Consolidated_${safeFile(report.period)}_Logistics_Report.pptx`, buffer });
+        setProgress((step + 1) / steps * 100, 'Done: consolidated.');
+      }
+
+      document.body.removeChild(offscreen);
+      restoreActive(previousActive, hasMerge);
+      setProgress(100, `${files.length} PPTs ready.`);
+      return files;
+    }
+
+    function captureCharts(offscreen) {
+      return {
+        status: captureChartOffscreen($('statusCanvas'), offscreen),
+        trend: captureChartOffscreen($('trendCanvas'), offscreen),
+        states: captureChartOffscreen($('stateCanvas'), offscreen),
+        aging: captureChartOffscreen($('agingCanvas'), offscreen)
+      };
+    }
+
+    function restoreActive(previousActive, hasMerge) {
+      if (previousActive === MERGED_INDEX && hasMerge) {
+        switchToDataset(MERGED_INDEX);
+      } else if (previousActive >= 0 && previousActive < app.datasets.length) {
+        switchToDataset(previousActive);
+      } else if (app.datasets.length) {
+        switchToDataset(0);
+      }
+    }
+
+    async function renderSinglePpt(Pptx, report) {
+      if (!window._pptxGlobal) window._pptxGlobal = Pptx;
+      const pptx = new Pptx();
+      pptx.layout = 'LAYOUT_WIDE';
+      pptx.author = 'Logistics Dashboard';
+      pptx.company = report.client;
+      pptx.subject = 'Monthly logistics report';
+      pptx.title = `${report.client} Logistics Report`;
+      pptx.theme = { headFontFace: 'Aptos Display', bodyFontFace: 'Aptos', lang: 'en-US' };
+
+      const cover = pptx.addSlide();
+      cover.background = { color: 'F7FAFC' };
+      drawCoverSlide(pptx, cover, report);
+
+      const exec = pptx.addSlide();
+      exec.background = { color: 'FFFFFF' };
+      drawExecutiveSlide(pptx, exec, report);
+
+      const performance = pptx.addSlide();
+      performance.background = { color: 'FFFFFF' };
+      drawPerformanceSlide(pptx, performance, report);
+
+      const network = pptx.addSlide();
+      network.background = { color: 'FFFFFF' };
+      drawNetworkSlide(pptx, network, report);
+
+      const exceptions = pptx.addSlide();
+      exceptions.background = { color: 'FFFFFF' };
+      drawExceptionSlide(pptx, exceptions, report);
+
+      return await pptx.write({ outputType: 'arraybuffer' });
+    }
+
+    async function buildAllWordReports() {
+      const total = app.datasets.length;
+      const previousActive = app.activeIndex;
+      const files = [];
+      let steps = total;
+      const hasMerge = total >= 2;
+      if (hasMerge) steps += 1;
+
+      for (let i = 0; i < total; i += 1) {
+        const ds = app.datasets[i];
+        setProgress(i / steps * 100, `Word: ${ds.client}...`);
+        const buffer = await generateWordDoc(buildReportForDataset(ds));
+        files.push({ name: `${safeFile(ds.client)}_${safeFile(dateRangeLabel(ds.records))}_Logistics_Report.docx`, buffer });
+        setProgress((i + 1) / steps * 100, `Done: ${ds.client}`);
+      }
+
+      if (hasMerge) {
+        const merged = getMergedRecords();
+        const step = total;
+        setProgress(step / steps * 100, 'Word: Consolidated...');
+        const summary = buildSummary(merged);
+        const aggregates = buildAggregates(merged);
+        const report = {
+          client: 'All Customers (Consolidated)',
+          source: `${total} merged files`,
+          period: dateRangeLabel(merged) || 'Selected period',
+          generated: `Generated ${formatDate(new Date())} from ${total} files`,
+          summary, aggregates,
+          insights: buildInsights(summary, aggregates),
+          tables: {
+            status: statusTable(merged, aggregates.status),
+            aging: agingTable(aggregates.aging),
+            lanes: laneTable(merged, aggregates.lanes),
+            exceptions: exceptionTable(merged)
+          }
+        };
+        const buffer = await generateWordDoc(report);
+        files.push({ name: `All_Customers_Consolidated_${safeFile(report.period)}_Logistics_Report.docx`, buffer });
+        setProgress((step + 1) / steps * 100, 'Done: consolidated.');
+      }
+
+      restoreActive(previousActive, hasMerge);
+      setProgress(100, `${files.length} Word docs ready.`);
+      return files;
+    }
+
+    async function generateWordDoc(report) {
+      const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, BorderStyle, AlignmentType, WidthType, HeadingLevel, PageNumber } = window.docx || window.Docx;
+      if (!Document) {
+        const fallback = await generateWordFallbackHtml(report);
+        return fallback;
+      }
+
+      const tableOpts = { borders: { insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' }, insideVertical: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' }, top: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' }, bottom: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' }, left: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' }, right: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' } }, width: { size: 100, type: WidthType.PERCENTAGE } };
+
+      function makeRow(cells, isHeader) {
+        return new TableRow({ children: cells.map(c => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: String(c), bold: isHeader, size: isHeader ? 18 : 16, color: isHeader ? '1E3A5F' : '333333' })], alignment: AlignmentType.LEFT, spacing: { before: 40, after: 40 } })], shading: isHeader ? { fill: 'EBF5FF' } : undefined, ...tableOpts })) });
+      }
+
+      function buildTable(rows) {
+        if (!rows.length) return [];
+        return [new Paragraph({ spacing: { before: 200 } }), new Table({ rows: rows.map((r, i) => makeRow(r, i === 0)), ...tableOpts })];
+      }
+
+      const sections = [
+        new Paragraph({ children: [new TextRun({ text: 'LOGISTICS PERFORMANCE REPORT', bold: true, size: 32, color: '1E3A5F' })], alignment: AlignmentType.CENTER, spacing: { after: 100 } }),
+        new Paragraph({ children: [new TextRun({ text: report.client, bold: true, size: 24, color: '2563EB' })], alignment: AlignmentType.CENTER, spacing: { after: 60 } }),
+        new Paragraph({ children: [new TextRun({ text: report.period, size: 18, color: '64748B' })], alignment: AlignmentType.CENTER, spacing: { after: 60 } }),
+        new Paragraph({ children: [new TextRun({ text: report.generated, size: 14, color: '94A3B8' })], alignment: AlignmentType.CENTER, spacing: { after: 200 } }),
+        new Paragraph({ children: [new TextRun({ text: 'Executive Summary', bold: true, size: 24, color: '1E3A5F' })], heading: HeadingLevel.HEADING_1, spacing: { before: 300, after: 100 } }),
+        new Paragraph({ children: [new TextRun({ text: `Total Shipments: ${numberFmt.format(report.summary.shipments)} | Delivered: ${report.summary.deliveredRate}% | On-Time: ${report.summary.onTimeRate}% | Open Delayed: ${numberFmt.format(report.summary.delayedOpen)}`, size: 18, color: '333333' })], spacing: { after: 200 } })
+      ];
+
+      report.insights.forEach(i => sections.push(new Paragraph({ children: [new TextRun({ text: `- ${i}`, size: 18, color: '475569' })], spacing: { after: 80 } })));
+
+      sections.push(new Paragraph({ children: [new TextRun({ text: 'Status Breakdown', bold: true, size: 22, color: '1E3A5F' })], heading: HeadingLevel.HEADING_2, spacing: { before: 300, after: 100 } }));
+      report.tables.status.length && sections.push(...buildTable(report.tables.status));
+
+      sections.push(new Paragraph({ children: [new TextRun({ text: 'Open Aging', bold: true, size: 22, color: '1E3A5F' })], heading: HeadingLevel.HEADING_2, spacing: { before: 300, after: 100 } }));
+      report.tables.aging.length && sections.push(...buildTable(report.tables.aging));
+
+      sections.push(new Paragraph({ children: [new TextRun({ text: 'Top Lanes', bold: true, size: 22, color: '1E3A5F' })], heading: HeadingLevel.HEADING_2, spacing: { before: 300, after: 100 } }));
+      report.tables.lanes.length && sections.push(...buildTable(report.tables.lanes));
+
+      sections.push(new Paragraph({ children: [new TextRun({ text: 'Priority Exceptions', bold: true, size: 22, color: '1E3A5F' })], heading: HeadingLevel.HEADING_2, spacing: { before: 300, after: 100 } }));
+      report.tables.exceptions.length && sections.push(...buildTable(report.tables.exceptions));
+
+      const doc = new Document({ sections: [{ children: sections, properties: { page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } } } }] });
+      return await Packer.toBuffer(doc);
+    }
+
+    async function generateWordFallbackHtml(report) {
+      let html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(report.client)} Report</title></head><body>`;
+      html += `<h1 style="color:#1E3A5F">Logistics Performance Report</h1>`;
+      html += `<h2 style="color:#2563EB">${escapeHtml(report.client)}</h2>`;
+      html += `<p style="color:#64748B">${escapeHtml(report.period)}</p>`;
+      html += `<hr><h3>Executive Summary</h3>`;
+      html += `<p>Total Shipments: ${numberFmt.format(report.summary.shipments)} | Delivered: ${report.summary.deliveredRate}% | On-Time: ${report.summary.onTimeRate}% | Open Delayed: ${numberFmt.format(report.summary.delayedOpen)}</p>`;
+      report.insights.forEach(i => html += `<p>- ${escapeHtml(i)}</p>`);
+      [['Status Breakdown', report.tables.status], ['Open Aging', report.tables.aging], ['Top Lanes', report.tables.lanes], ['Priority Exceptions', report.tables.exceptions]].forEach(([title, rows]) => {
+        if (rows.length) {
+          html += `<h3>${title}</h3><table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:13px">`;
+          rows.forEach((r, i) => {
+            html += `<tr${i === 0 ? ' style="background:#EBF5FF;font-weight:bold;color:#1E3A5F"' : i % 2 ? ' style="background:#F8FAFC"' : ''}>`;
+            r.forEach(c => html += `<td style="border:1px solid #ccc;padding:6px">${escapeHtml(String(c))}</td>`);
+            html += `</tr>`;
+          });
+          html += `</table>`;
+        }
+      });
+      html += `</body></html>`;
+      return new Blob([html], { type: 'application/msword' });
+    }
+
+    async function buildAllPdfReports() {
+      const total = app.datasets.length;
+      const previousActive = app.activeIndex;
+      const files = [];
+      const offscreen = document.createElement('canvas');
+      offscreen.width = 620;
+      offscreen.height = 340;
+      offscreen.style.position = 'absolute';
+      offscreen.style.left = '-9999px';
+      document.body.appendChild(offscreen);
+
+      let steps = total;
+      const hasMerge = total >= 2;
+      if (hasMerge) steps += 1;
+      const jsPDFLib = window.jspdf ? window.jspdf.jsPDF : null;
+
+      if (!jsPDFLib) {
+        showToast('PDF library not loaded. Trying fallback...');
+        for (let i = 0; i < total; i += 1) {
+          const ds = app.datasets[i];
+          setProgress(i / steps * 100, `PDF: ${ds.client}...`);
+          const blob = await generatePdfFallback(buildReportForDataset(ds));
+          files.push({ name: `${safeFile(ds.client)}_${safeFile(dateRangeLabel(ds.records))}_Logistics_Report.pdf`, buffer: await blob.arrayBuffer() });
+        }
+        if (hasMerge) {
+          const merged = getMergedRecords();
+          const summary = buildSummary(merged);
+          const aggregates = buildAggregates(merged);
+          const blob = await generatePdfFallback({ client: 'All Customers (Consolidated)', source: `${total} merged`, period: dateRangeLabel(merged) || '', generated: `Generated ${formatDate(new Date())}`, summary, aggregates, insights: buildInsights(summary, aggregates), tables: { status: statusTable(merged, aggregates.status), aging: agingTable(aggregates.aging), lanes: laneTable(merged, aggregates.lanes), exceptions: exceptionTable(merged) } });
+          files.push({ name: `All_Customers_Consolidated_${safeFile(dateRangeLabel(merged))}_Logistics_Report.pdf`, buffer: await blob.arrayBuffer() });
+        }
+        document.body.removeChild(offscreen);
+        restoreActive(previousActive, hasMerge);
+        setProgress(100, `${files.length} PDFs ready.`);
+        return files;
+      }
+
+      for (let i = 0; i < total; i += 1) {
+        const ds = app.datasets[i];
+        setProgress(i / steps * 100, `PDF: ${ds.client}...`);
+        switchToAndRenderCharts(i, ds.records, ds.source);
+        const charts = captureCharts(offscreen);
+        setProgress((i + 0.6) / steps * 100, `Rendering PDF for ${ds.client}...`);
+        const report = Object.assign(buildReportForDataset(ds), { charts });
+        const buffer = await renderPdfWithCharts(jsPDFLib, report);
+        files.push({ name: `${safeFile(report.client)}_${safeFile(report.period)}_Logistics_Report.pdf`, buffer });
+        setProgress((i + 1) / steps * 100, `Done: ${ds.client}`);
+      }
+
+      if (hasMerge) {
+        const merged = getMergedRecords();
+        const step = total;
+        setProgress(step / steps * 100, 'PDF: Consolidated...');
+        switchToAndRenderCharts(MERGED_INDEX, merged, `${total} merged files`);
+        const charts = captureCharts(offscreen);
+        const summary = buildSummary(merged);
+        const aggregates = buildAggregates(merged);
+        const report = {
+          client: 'All Customers (Consolidated)', source: `${total} merged files`,
+          period: dateRangeLabel(merged) || 'Selected period',
+          generated: `Generated ${formatDate(new Date())} from ${total} files`,
+          summary, aggregates, insights: buildInsights(summary, aggregates), charts,
+          tables: { status: statusTable(merged, aggregates.status), aging: agingTable(aggregates.aging), lanes: laneTable(merged, aggregates.lanes), exceptions: exceptionTable(merged) }
+        };
+        const buffer = await renderPdfWithCharts(jsPDFLib, report);
+        files.push({ name: `All_Customers_Consolidated_${safeFile(report.period)}_Logistics_Report.pdf`, buffer });
+        setProgress((step + 1) / steps * 100, 'Done: consolidated.');
+      }
+
+      document.body.removeChild(offscreen);
+      restoreActive(previousActive, hasMerge);
+      setProgress(100, `${files.length} PDFs ready.`);
+      return files;
+    }
+
+    async function renderPdfWithCharts(jsPDFLib, report) {
+      const doc = new jsPDFLib({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pw = 210, ph = 297;
+      const ml = 15, mt = 15, cw = pw - 2 * ml;
+
+      function addHeader(text, y, size, color) {
+        doc.setFontSize(size || 22);
+        doc.setTextColor(color || '#1E3A5F');
+        doc.text(text, ml, y);
+        return y + (size > 18 ? 10 : 7);
+      }
+
+      function addText(text, y, size, color) {
+        doc.setFontSize(size || 10);
+        doc.setTextColor(color || '#333333');
+        const lines = doc.splitTextToSize(String(text), cw);
+        doc.text(lines, ml, y);
+        return y + lines.length * (size + 1);
+      }
+
+      function addTable(rows, y, colWidths) {
+        if (!rows.length) return y;
+        doc.setFontSize(8);
+        const rowH = 6;
+        rows.forEach((r, ri) => {
+          const bg = ri === 0 ? '#EBF5FF' : ri % 2 ? '#F8FAFC' : '#FFFFFF';
+          doc.setFillColor(bg === '#EBF5FF' ? 235 : bg === '#F8FAFC' ? 248 : 255, bg === '#EBF5FF' ? 245 : bg === '#F8FAFC' ? 250 : 255, bg === '#EBF5FF' ? 255 : bg === '#F8FAFC' ? 252 : 255);
+          doc.rect(ml, y, cw, rowH, 'F');
+          let cx = ml;
+          r.forEach((c, ci) => {
+            const w = colWidths && colWidths[ci] ? cw * colWidths[ci] : cw / r.length;
+            if (ri === 0) doc.setFont('helvetica', 'bold');
+            else doc.setFont('helvetica', 'normal');
+            doc.setTextColor(ri === 0 ? '#1E3A5F' : '#333333');
+            doc.text(String(c || ''), cx + 1, y + rowH - 1.5);
+            cx += w;
+          });
+          y += rowH;
+        });
+        return y + 3;
+      }
+
+      let y = mt + 5;
+      y = addHeader('LOGISTICS PERFORMANCE REPORT', y, 20, '#1E3A5F');
+      y = addHeader(report.client, y, 14, '#2563EB');
+      y = addText(report.period, y, 9, '#64748B');
+      y = addText(report.generated, y, 7, '#94A3B8');
+      y += 5;
+      doc.setDrawColor(37, 99, 235);
+      doc.line(ml, y, ml + cw, y);
+      y += 8;
+      y = addHeader('Executive Summary', y, 14, '#1E3A5F');
+      y = addText(`Total Shipments: ${numberFmt.format(report.summary.shipments)} | Delivered: ${report.summary.deliveredRate}% | On-Time: ${report.summary.onTimeRate}% | Open Delayed: ${numberFmt.format(report.summary.delayedOpen)}`, y, 9, '#475569');
+      report.insights.forEach(i => { y = addText(`- ${i}`, y, 8, '#64748B'); });
+      y += 3;
+
+      if (report.charts && report.charts.status) {
+        if (y > 220) { doc.addPage(); y = mt + 5; }
+        y = addHeader('Charts', y, 14, '#1E3A5F');
+        try {
+          if (report.charts.status) { doc.addImage(report.charts.status, 'PNG', ml, y, cw / 2 - 2, 35); }
+          if (report.charts.trend) { doc.addImage(report.charts.trend, 'PNG', ml + cw / 2 + 2, y, cw / 2 - 2, 35); }
+          y += 38;
+          if (y > 255) { doc.addPage(); y = mt + 5; }
+          if (report.charts.states) { doc.addImage(report.charts.states, 'PNG', ml, y, cw / 2 - 2, 30); }
+          if (report.charts.aging) { doc.addImage(report.charts.aging, 'PNG', ml + cw / 2 + 2, y, cw / 2 - 2, 30); }
+          y += 33;
+        } catch(e) { y += 5; }
+      }
+      y += 3;
+
+      if (y > 240) { doc.addPage(); y = mt + 5; }
+      y = addHeader('Status Breakdown', y, 13, '#1E3A5F');
+      y = addTable(report.tables.status, y, [0.3, 0.2, 0.2, 0.3]);
+
+      if (y > 260) { doc.addPage(); y = mt + 5; }
+      y = addHeader('Open Aging', y, 13, '#1E3A5F');
+      y = addTable(report.tables.aging, y, [0.3, 0.3, 0.4]);
+
+      if (y > 260) { doc.addPage(); y = mt + 5; }
+      y = addHeader('Top Lanes', y, 13, '#1E3A5F');
+      y = addTable(report.tables.lanes, y, [0.3, 0.18, 0.18, 0.18, 0.16]);
+
+      if (y > 260) { doc.addPage(); y = mt + 5; }
+      y = addHeader('Priority Exceptions', y, 13, '#1E3A5F');
+      y = addTable(report.tables.exceptions, y, [0.18, 0.18, 0.14, 0.14, 0.16, 0.1, 0.1]);
+
+      const out = doc.output('arraybuffer');
+      return out;
+    }
+
+    async function generatePdfFallback(report) {
+      let html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(report.client)} Report</title>`;
+      html += `<style>body{font-family:Inter,sans-serif;color:#333;padding:30px;max-width:800px;margin:0 auto}h1{color:#1E3A5F;font-size:24px;border-bottom:3px solid #2563EB;padding-bottom:8px}h2{color:#2563EB;font-size:18px}h3{color:#1E3A5F;font-size:16px;margin-top:24px}table{border-collapse:collapse;width:100%;margin:10px 0}th{background:#EBF5FF;color:#1E3A5F;padding:8px;text-align:left;border:1px solid #ccc;font-size:12px}td{padding:8px;border:1px solid #ccc;font-size:11px}.alt{background:#F8FAFC}.insight{color:#475569;margin:4px 0}</style></head><body>`;
+      html += `<h1>Logistics Performance Report</h1><h2>${escapeHtml(report.client)}</h2>`;
+      html += `<p style="color:#64748B">${escapeHtml(report.period)}</p><hr>`;
+      html += `<h3>Executive Summary</h3>`;
+      html += `<p>Total Shipments: ${numberFmt.format(report.summary.shipments)} | Delivered: ${report.summary.deliveredRate}% | On-Time: ${report.summary.onTimeRate}% | Open Delayed: ${numberFmt.format(report.summary.delayedOpen)}</p>`;
+      report.insights.forEach(i => html += `<p class="insight">- ${escapeHtml(i)}</p>`);
+      [['Status Breakdown', report.tables.status], ['Open Aging', report.tables.aging], ['Top Lanes', report.tables.lanes], ['Priority Exceptions', report.tables.exceptions]].forEach(([title, rows]) => {
+        if (rows.length) {
+          html += `<h3>${title}</h3><table>`;
+          rows.forEach((r, i) => {
+            html += `<tr${i === 0 ? '' : i % 2 ? ' class="alt"' : ''}>`;
+            r.forEach(c => html += `<${i === 0 ? 'th' : 'td'}>${escapeHtml(String(c))}</${i === 0 ? 'th' : 'td'}>`);
+            html += `</tr>`;
+          });
+          html += `</table>`;
+        }
+      });
+      html += `<p style="color:#94A3B8;font-size:10px;margin-top:30px">${escapeHtml(report.generated)}</p>`;
+      html += `</body></html>`;
+
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const printWindow = window.open(url, '_blank');
+      if (printWindow) {
+        printWindow.onload = () => {
+          setTimeout(() => {
+            printWindow.print();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+          }, 500);
+        };
+      }
+      return blob;
+    }
+
+    function downloadReportFiles(files, format) {
+      if (!files.length) return;
+      const ext = format === 'ppt' ? 'pptx' : format;
+      const mimeTypes = {
+        ppt: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        word: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        pdf: 'application/pdf'
+      };
+      const mime = mimeTypes[format] || 'application/octet-stream';
+
+      if (files.length === 1) {
+        const blob = new Blob([files[0].buffer], { type: mime });
+        triggerDownload(blob, files[0].name);
+        showToast(`${format.toUpperCase()} ready.`);
+        return;
+      }
+
+      const JSZip = window.JSZip;
+      if (typeof JSZip === 'function' || typeof JSZip === 'object') {
+        const zip = new JSZip();
+        files.forEach(f => zip.file(f.name, f.buffer));
+        zip.generateAsync({ type: 'blob' }).then(blob => {
+          triggerDownload(blob, `Logistics_Reports_${safeFile(formatDate(new Date()))}.zip`);
+          showToast(`Downloaded ${files.length} ${format.toUpperCase()}s as ZIP.`);
+        });
+      } else {
+        files.forEach((f, index) => {
+          const blob = new Blob([f.buffer], { type: mime });
+          triggerDownload(blob, `${index + 1}_${f.name}`);
+        });
+        showToast(`Downloaded ${files.length} ${format.toUpperCase()}s individually.`);
+      }
+    }
+
+    function triggerDownload(blob, filename) {
+      if (dom.pptLink.dataset.url) URL.revokeObjectURL(dom.pptLink.dataset.url);
+      const url = URL.createObjectURL(blob);
+      dom.pptLink.href = url;
+      dom.pptLink.download = filename;
+      dom.pptLink.dataset.url = url;
+      dom.pptLink.classList.remove('hidden');
+      dom.pptLink.click();
+    }
+
+    function buildPptReport() {
+      const summary = buildSummary(app.filtered);
+      const aggregates = buildAggregates(app.filtered);
+      const statusRows = statusTable(app.filtered, aggregates.status);
+      const agingRows = agingTable(aggregates.aging);
+      const lanes = laneTable(app.filtered, aggregates.lanes);
+      const exceptions = exceptionTable(app.filtered);
+      return {
+        client: commonValue(app.filtered, r => r.client) || 'Customer',
+        period: dateRangeLabel(app.filtered) || 'Selected period',
+        generated: `Generated ${formatDate(new Date())} from ${app.source || 'uploaded CSV'}`,
+        summary,
+        aggregates,
+        insights: buildInsights(summary, aggregates),
+        charts: {
+          status: $('statusCanvas').toDataURL('image/png'),
+          trend: $('trendCanvas').toDataURL('image/png'),
+          states: $('stateCanvas').toDataURL('image/png'),
+          aging: $('agingCanvas').toDataURL('image/png')
+        },
+        tables: {
+          status: statusRows,
+          aging: agingRows,
+          lanes,
+          exceptions
+        }
+      };
+    }
+
+    const PPT_THEME = {
+      primary: '1E3A5F',
+      accent: '2563EB',
+      accentLight: 'DBEAFE',
+      dark: '0F172A',
+      gray: '64748B',
+      lightGray: '94A3B8',
+      bg: 'F8FAFC',
+      success: '059669',
+      warning: 'D97706',
+      danger: 'DC2626',
+      white: 'FFFFFF',
+      barColor: '1E3A5F'
+    };
+
+    function drawCoverSlide(pptx, slide, report) {
+      slide.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 13.33, h: 0.55, fill: { color: PPT_THEME.primary }, line: { color: PPT_THEME.primary } });
+      slide.addText('MONTHLY LOGISTICS REPORT', {
+        x: 0.5, y: 0.08, w: 12.3, h: 0.4, fontSize: 10, color: 'FFFFFF', bold: true
+      });
+      slide.addShape(pptx.ShapeType.rect, { x: 0.62, y: 1.0, w: 12.1, h: 0.03, fill: { color: PPT_THEME.accent }, line: { color: PPT_THEME.accent } });
+      slide.addText('Logistics Performance Report', {
+        x: 0.62, y: 1.28, w: 8.5, h: 0.55, fontSize: 28, bold: true, color: PPT_THEME.dark
+      });
+      slide.addText(report.client, {
+        x: 0.64, y: 1.9, w: 7.5, h: 0.32, fontSize: 16, bold: true, color: PPT_THEME.primary
+      });
+      slide.addText(report.period, {
+        x: 0.64, y: 2.28, w: 7.5, h: 0.25, fontSize: 11, color: PPT_THEME.gray
+      });
+      addPptRule(pptx, slide, 0.62, 2.75, 12.1);
+      addPptKpis(pptx, slide, [
+        ['Total Shipments', numberFmt.format(report.summary.shipments), 'All consignments'],
+        ['Delivered', `${report.summary.deliveredRate}%`, `${numberFmt.format(report.summary.delivered)} closed`],
+        ['On-Time Rate', `${report.summary.onTimeRate}%`, `${numberFmt.format(report.summary.lateDelivered)} late`],
+        ['Open Delayed', numberFmt.format(report.summary.delayedOpen), `${numberFmt.format(report.summary.open)} open`]
+      ], 0.62, 3.15, PPT_THEME.primary);
+      const calloutY = 4.65;
+      slide.addShape(pptx.ShapeType.rect, {
+        x: 0.72, y: calloutY, w: 11.9, h: 1.55,
+        fill: { color: PPT_THEME.bg },
+        line: { color: 'DDE7F0', pt: 0.8 }
+      });
+      slide.addShape(pptx.ShapeType.rect, {
+        x: 0.72, y: calloutY, w: 0.06, h: 1.55,
+        fill: { color: PPT_THEME.accent }, line: { color: PPT_THEME.accent }
+      });
+      slide.addText('Executive Summary', {
+        x: 1.0, y: calloutY + 0.12, w: 11.3, h: 0.22, fontSize: 10, bold: true, color: PPT_THEME.dark
+      });
+      const text = report.insights.slice(0, 3).map(i => `- ${i}`).join('\n');
+      slide.addText(text, {
+        x: 1.05, y: calloutY + 0.45, w: 11.2, h: 0.95, fontSize: 8.5, color: '334155', valign: 'top'
+      });
+      slide.addText(report.generated, {
+        x: 0.62, y: 6.94, w: 10.8, h: 0.18, fontSize: 7.5, color: PPT_THEME.lightGray
+      });
+      addPptFooter(slide, 'Confidential - For internal use only', report.client);
+    }
+
+    function drawExecutiveSlide(pptx, slide, report) {
+      addPptSlideHeader(pptx, slide, 'Executive Summary', report.period, 'Key metrics, trends, and aging overview');
+      addPptKpis(pptx, slide, [
+        ['Package Value', report.summary.valueLabel, 'Declared invoice value'],
+        ['Total Boxes', numberFmt.format(report.summary.boxes), report.summary.weightLabel],
+        ['Avg TAT', report.summary.avgTatLabel, 'Pickup to delivery'],
+        ['Attempted', numberFmt.format(report.summary.attempted), 'Shipments with delivery attempt']
+      ], 0.45, 0.95, PPT_THEME.accent);
+
+      const leftX = 0.55, rightX = 6.75, tableW = 5.75;
+      addPptCalloutBox(pptx, slide, leftX, 2.22, tableW, 2.15, 'Key Insights', report.insights, PPT_THEME.accent);
+      addPptDataTable(pptx, slide, report.tables.status, rightX, 2.22, tableW, 2.15, [2.4, 1.05, 1.05, 1.25]);
+      addPptChart(pptx, slide, report.charts.trend, leftX, 4.82, tableW, 1.75, 'Daily Manifest Trend');
+      addPptDataTable(pptx, slide, report.tables.aging, rightX, 4.82, tableW, 1.75, [2.2, 1.2, 2.35]);
+      addPptFooter(slide, report.generated, report.client);
+    }
+
+    function drawPerformanceSlide(pptx, slide, report) {
+      addPptSlideHeader(pptx, slide, 'Service Performance', 'Delivery closure, promise adherence, and daily movement', 'Operational metrics with visual breakdowns');
+      addPptChart(pptx, slide, report.charts.status, 0.5, 1.02, 5.95, 4.35, 'Shipment Status Distribution');
+      addPptChart(pptx, slide, report.charts.trend, 6.8, 1.02, 5.95, 2.35, 'Daily Manifest Volume');
+      addPptCalloutBox(pptx, slide, 6.8, 3.78, 5.95, 1.6, 'Performance Notes', [
+        `${report.summary.deliveredRate}% of shipments closed delivered.`,
+        `${report.summary.onTimeRate}% met promise date.`,
+        `${numberFmt.format(report.summary.delayedOpen)} open shipments past promise — review first.`
+      ], PPT_THEME.warning);
+      addPptFooter(slide, report.generated, report.client);
+    }
+
+    function drawNetworkSlide(pptx, slide, report) {
+      addPptSlideHeader(pptx, slide, 'Network & Movement', 'Geographic distribution, aging profile, and top lanes', 'Destination states, open aging, and lane volumes');
+      addPptChart(pptx, slide, report.charts.states, 0.5, 1.02, 5.95, 3.25, 'Top Destination States');
+      addPptChart(pptx, slide, report.charts.aging, 6.8, 1.02, 5.95, 3.25, 'Open Shipment Aging');
+      addPptDataTable(pptx, slide, report.tables.lanes, 0.55, 4.82, 12.1, 1.65, [5.3, 1.65, 1.65, 1.65, 1.85]);
+      addPptFooter(slide, report.generated, report.client);
+    }
+
+    function drawExceptionSlide(pptx, slide, report) {
+      addPptSlideHeader(pptx, slide, 'Exceptions & Priority Items', 'Delayed, late, and open shipments requiring attention', 'Actionable items for customer review');
+      addPptCalloutBox(pptx, slide, 0.55, 0.98, 12.1, 0.88, 'Recommended Actions', [
+        'Prioritize open delayed shipments — confirm ETAs with customers immediately.',
+        'Review late-delivered lanes to identify recurring network or appointment issues.'
+      ], PPT_THEME.danger);
+      addPptDataTable(pptx, slide, report.tables.exceptions, 0.55, 2.18, 12.1, 4.2, [2.05, 2.4, 1.35, 1.35, 1.65, 1.45, 1.85]);
+      addPptFooter(slide, report.generated, report.client);
+    }
+
+    function addPptSlideHeader(pptx, slide, title, subtitle, description) {
+      slide.addShape(pptx.ShapeType.rect, {
+        x: 0, y: 0, w: 13.33, h: 0.08,
+        fill: { color: PPT_THEME.primary }, line: { color: PPT_THEME.primary }
+      });
+      slide.addText(title, { x: 0.45, y: 0.18, w: 7.8, h: 0.34, fontSize: 20, bold: true, color: PPT_THEME.dark });
+      slide.addText(subtitle || '', { x: 0.45, y: 0.56, w: 8.8, h: 0.2, fontSize: 9, color: PPT_THEME.gray });
+      if (description) {
+        slide.addText(description, { x: 0.45, y: 0.78, w: 8.8, h: 0.17, fontSize: 8, color: PPT_THEME.lightGray });
+      }
+    }
+
+    function addPptKpis(pptx, slide, metrics, x, y, accent) {
+      const cards = [
+        { fill: 'EBF5FF', border: '93C5FD' },
+        { fill: 'D1FAE5', border: '6EE7B7' },
+        { fill: 'FEF3C7', border: 'FCD34D' },
+        { fill: 'FEE2E2', border: 'FCA5A5' }
+      ];
+      metrics.forEach((metric, index) => {
+        const left = x + index * 3.12;
+        const card = cards[index % cards.length];
+        slide.addShape(pptx.ShapeType.rect, {
+          x: left, y, w: 2.82, h: 0.98,
+          fill: { color: card.fill },
+          line: { color: card.border, pt: 0.8 }
+        });
+        slide.addText(String(metric[1]), {
+          x: left + 0.12, y: y + 0.1, w: 2.58, h: 0.3,
+          fontSize: 18, bold: true, color: PPT_THEME.dark
+        });
+        slide.addText(String(metric[0]), {
+          x: left + 0.12, y: y + 0.48, w: 2.58, h: 0.17,
+          fontSize: 7.5, bold: true, color: '475569'
+        });
+        slide.addText(String(metric[2] || ''), {
+          x: left + 0.12, y: y + 0.7, w: 2.58, h: 0.16,
+          fontSize: 7, color: PPT_THEME.gray
+        });
+      });
+    }
+
+    function addPptChart(pptx, slide, data, x, y, w, h, label) {
+      slide.addShape(pptx.ShapeType.rect, {
+        x: x - 0.02, y: y - 0.32, w: w + 0.04, h: h + 0.38,
+        fill: { color: PPT_THEME.white },
+        line: { color: 'DDE7F0', pt: 0.7 }
+      });
+      slide.addText(label, {
+        x: x + 0.08, y: y - 0.28, w: w - 0.16, h: 0.2,
+        fontSize: 9, bold: true, color: PPT_THEME.primary
+      });
+      slide.addImage({ data, x: x + 0.05, y: y + 0.05, w: w - 0.1, h: h - 0.1 });
+    }
+
+    function addPptCalloutBox(pptx, slide, x, y, w, h, title, bullets, accent) {
+      slide.addShape(pptx.ShapeType.rect, {
+        x, y, w, h,
+        fill: { color: PPT_THEME.bg },
+        line: { color: 'DDE7F0', pt: 0.8 }
+      });
+      slide.addShape(pptx.ShapeType.rect, {
+        x, y, w: 0.06, h,
+        fill: { color: accent || PPT_THEME.accent },
+        line: { color: accent || PPT_THEME.accent }
+      });
+      slide.addText(title, {
+        x: x + 0.2, y: y + 0.12, w: w - 0.36, h: 0.2,
+        fontSize: 9, bold: true, color: PPT_THEME.dark
+      });
+      const text = bullets.slice(0, 5).map(item => `- ${item}`).join('\n');
+      slide.addText(text, {
+        x: x + 0.24, y: y + 0.42, w: w - 0.48, h: h - 0.55,
+        fontSize: 8.2, color: '334155', valign: 'top'
+      });
+    }
+
+    function addPptDataTable(pptx, slide, rows, x, y, w, h, colWeights) {
+      const safeRows = rows.length ? rows : [['No data']];
+      const totalWeight = colWeights.reduce((total, value) => total + value, 0);
+      const rowH = Math.min(h / safeRows.length, 0.45);
+      safeRows.forEach((row, rowIndex) => {
+        let cx = x;
+        row.forEach((cell, colIndex) => {
+          const cw = w * ((colWeights[colIndex] || 1) / totalWeight);
+          const isHeader = rowIndex === 0;
+          const bgColor = isHeader ? PPT_THEME.primary : rowIndex % 2 ? 'FFFFFF' : 'F1F5F9';
+          slide.addShape(pptx.ShapeType.rect, {
+            x: cx, y: y + rowIndex * rowH, w: cw, h: rowH,
+            fill: { color: bgColor },
+            line: { color: isHeader ? PPT_THEME.primary : 'DDE7F0', pt: 0.45 }
+          });
+          slide.addText(String(cell == null ? '' : cell), {
+            x: cx + 0.05,
+            y: y + rowIndex * rowH + 0.04,
+            w: Math.max(0.1, cw - 0.1),
+            h: Math.max(0.1, rowH - 0.08),
+            fontSize: isHeader ? 7 : 6.8,
+            bold: isHeader,
+            color: isHeader ? 'FFFFFF' : '1F2937',
+            margin: 0.02,
+            valign: 'mid'
+          });
+          cx += cw;
+        });
+      });
+    }
+
+    function addPptBar(pptx, slide, x, y, w, h, color) {
+      slide.addShape(pptx.ShapeType.rect, { x, y, w, h, fill: { color }, line: { color } });
+    }
+
+    function addPptRule(pptx, slide, x, y, w) {
+      addPptBar(pptx, slide, x, y, w, 0.018, 'CBD5E1');
+    }
+
+    function addPptFooter(slide, text, client) {
+      slide.addShape(pptx.ShapeType.rect, {
+        x: 0, y: 6.92, w: 13.33, h: 0.01,
+        fill: { color: 'CBD5E1' }, line: { color: 'CBD5E1' }
+      });
+      slide.addText(text || '', { x: 0.45, y: 6.95, w: 10.6, h: 0.16, fontSize: 7, color: PPT_THEME.lightGray });
+      slide.addText(client || 'Logistics', { x: 11.25, y: 6.95, w: 1.65, h: 0.16, fontSize: 7, bold: true, color: PPT_THEME.primary, align: 'right' });
+    }
+
+    function laneTable(records, lanes) {
+      const rows = [['Lane', 'Shipments', 'Delivered', 'Open', 'Delivery rate']];
+      lanes.slice(0, 6).forEach(lane => {
+        const laneRecords = records.filter(r => `${r.origin} -> ${r.destination}` === lane.label);
+        const delivered = laneRecords.filter(r => r.isDelivered).length;
+        const rate = lane.value ? Math.round(delivered / lane.value * 100) : 0;
+        rows.push([truncate(lane.label, 46), numberFmt.format(lane.value), numberFmt.format(delivered), numberFmt.format(lane.value - delivered), `${rate}%`]);
+      });
+      return rows;
+    }
+
+    function exceptionTable(records) {
+      const rows = [['Order', 'Destination', 'Status', 'Promise', 'Last scan', 'Amount', 'Action']];
+      priorityRecords(records)
+        .filter(r => !r.isDelivered || getFlags(r).delayedOpen || getFlags(r).lateDelivered)
+        .slice(0, 8)
+        .forEach(record => {
+          const flags = getFlags(record);
+          rows.push([
+            truncate(record.id, 22),
+            truncate(`${record.destination}, ${record.state}`, 28),
+            badgeFor(record).label,
+            formatDate(record.promiseDate),
+            formatDate(record.lastScanDate),
+            formatMoney(record.amount),
+            flags.delayedOpen ? 'Expedite / confirm ETA' : record.isDelivered ? 'Review late reason' : 'Track movement'
+          ]);
+        });
+      return rows;
+    }
+
+    function statusTable(records, statusEntries) {
+      const total = Math.max(1, records.length);
+      const rows = [['Status', 'Count', 'Share', 'Comment']];
+      statusEntries.forEach(entry => {
+        const share = Math.round(entry.value / total * 100);
+        const comment = entry.label.toLowerCase() === 'delivered' ? 'Closed' : entry.label.toLowerCase().includes('transit') ? 'Moving' : 'Needs monitoring';
+        rows.push([entry.label, numberFmt.format(entry.value), `${share}%`, comment]);
+      });
+      return rows;
+    }
+
+    function agingTable(agingEntries) {
+      const rows = [['Open aging', 'Count', 'Interpretation']];
+      agingEntries.forEach(entry => {
+        const note = entry.label === '9d+' ? 'Escalate' : entry.label === '6-8d' ? 'Watchlist' : 'Normal follow-up';
+        rows.push([entry.label, numberFmt.format(entry.value), note]);
+      });
+      return rows;
+    }
+
+    function buildInsights(summary, aggregates) {
+      const topState = aggregates.states[0] || { label: 'No state', value: 0 };
+      const topLane = aggregates.lanes[0] || { label: 'No lane', value: 0 };
+      const oldestBucket = aggregates.aging.slice().sort((a, b) => b.value - a.value)[0] || { label: '0-2d', value: 0 };
+      return [
+        `${summary.deliveredRate}% delivery closure across ${numberFmt.format(summary.shipments)} shipments; ${numberFmt.format(summary.open)} remain open.`,
+        `${summary.onTimeRate}% on-time delivery performance with ${numberFmt.format(summary.lateDelivered)} late delivered shipments.`,
+        `${numberFmt.format(summary.delayedOpen)} open shipments are past promise date and require customer-facing ETA updates.`,
+        `${topState.label} is the largest destination state with ${numberFmt.format(topState.value)} shipments.`,
+        `Highest volume lane is ${topLane.label} with ${numberFmt.format(topLane.value)} shipments; open aging is concentrated in ${oldestBucket.label}.`
+      ];
+    }
+
+    function setupCanvas(canvas) {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+      const width = Math.max(320, Math.floor(rect.width || 420));
+      const height = Math.max(210, Math.floor(rect.height || 250));
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.textBaseline = 'middle';
+      return { ctx, width, height };
+    }
+
+    function drawDonut(canvas, entries, palette) {
+      const chart = setupCanvas(canvas);
+      const data = entries.filter(e => e.value > 0);
+      const total = sum(data, e => e.value);
+      if (!total) return drawEmpty(chart, 'No status data');
+      const { ctx, width, height } = chart;
+      const compact = width < 440;
+      const cx = compact ? width / 2 : 96;
+      const cy = compact ? 92 : height / 2;
+      const radius = Math.min(74, height * 0.31);
+      let start = -Math.PI / 2;
+      data.forEach((entry, index) => {
+        const angle = entry.value / total * Math.PI * 2;
+        ctx.beginPath();
+        ctx.strokeStyle = palette[index % palette.length];
+        ctx.lineWidth = 25;
+        ctx.arc(cx, cy, radius, start, start + angle);
+        ctx.stroke();
+        start += angle;
+      });
+      ctx.fillStyle = COLORS.ink;
+      ctx.textAlign = 'center';
+      ctx.font = '800 25px Inter, system-ui, sans-serif';
+      ctx.fillText(numberFmt.format(total), cx, cy - 5);
+      ctx.fillStyle = COLORS.gray;
+      ctx.font = '11px Inter, system-ui, sans-serif';
+      ctx.fillText('shipments', cx, cy + 20);
+      const legendX = compact ? 24 : 205;
+      const legendY = compact ? 178 : 55;
+      data.slice(0, 6).forEach((entry, index) => {
+        const y = legendY + index * 25;
+        ctx.fillStyle = palette[index % palette.length];
+        ctx.fillRect(legendX, y - 5, 10, 10);
+        ctx.fillStyle = COLORS.ink;
+        ctx.textAlign = 'left';
+        ctx.font = '12px Inter, system-ui, sans-serif';
+        ctx.fillText(truncate(entry.label, compact ? 18 : 24), legendX + 16, y);
+        ctx.fillStyle = COLORS.gray;
+        ctx.textAlign = 'right';
+        ctx.fillText(numberFmt.format(entry.value), width - 18, y);
+      });
+    }
+
+    function drawLine(canvas, series, color) {
+      const chart = setupCanvas(canvas);
+      const data = series.slice(-22);
+      if (!data.length) return drawEmpty(chart, 'No trend data');
+      const { ctx, width, height } = chart;
+      const m = { top: 22, right: 16, bottom: 36, left: 36 };
+      const w = width - m.left - m.right;
+      const h = height - m.top - m.bottom;
+      const max = Math.max(1, ...data.map(p => p.value));
+      ctx.strokeStyle = '#E2E8F0';
+      for (let i = 0; i <= 4; i += 1) {
+        const y = m.top + h / 4 * i;
+        ctx.beginPath();
+        ctx.moveTo(m.left, y);
+        ctx.lineTo(width - m.right, y);
+        ctx.stroke();
+      }
+      const points = data.map((point, index) => ({
+        x: m.left + (data.length === 1 ? w / 2 : w / (data.length - 1) * index),
+        y: m.top + h - point.value / max * h,
+        point
+      }));
+      ctx.beginPath();
+      points.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      points.forEach(p => {
+        ctx.beginPath();
+        ctx.fillStyle = '#fff';
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      });
+      ctx.fillStyle = COLORS.gray;
+      ctx.font = '10px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      const every = Math.max(1, Math.ceil(data.length / 6));
+      points.forEach((p, i) => {
+        if (i % every === 0 || i === points.length - 1) ctx.fillText(p.point.label, p.x, height - 16);
+      });
+    }
+
+    function drawHorizontalBars(canvas, entries, color) {
+      const chart = setupCanvas(canvas);
+      const data = entries.slice(0, 8).filter(e => e.value > 0);
+      if (!data.length) return drawEmpty(chart, 'No state data');
+      const { ctx, width, height } = chart;
+      const max = Math.max(1, ...data.map(e => e.value));
+      const left = Math.min(138, width * 0.36);
+      const rowH = Math.min(26, (height - 34) / data.length);
+      data.forEach((entry, index) => {
+        const y = 22 + index * rowH;
+        const barW = (width - left - 42) * entry.value / max;
+        ctx.fillStyle = COLORS.ink;
+        ctx.font = '11px Inter, system-ui, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(truncate(entry.label, 18), left - 10, y + rowH / 2);
+        ctx.fillStyle = '#EAF2F8';
+        ctx.fillRect(left, y + 5, width - left - 42, rowH - 10);
+        ctx.fillStyle = color;
+        ctx.fillRect(left, y + 5, barW, rowH - 10);
+        ctx.fillStyle = COLORS.gray;
+        ctx.textAlign = 'left';
+        ctx.fillText(numberFmt.format(entry.value), left + barW + 7, y + rowH / 2);
+      });
+    }
+
+    function drawVerticalBars(canvas, entries, color) {
+      const chart = setupCanvas(canvas);
+      const total = sum(entries, e => e.value);
+      if (!total) return drawEmpty(chart, 'No open shipments');
+      const { ctx, width, height } = chart;
+      const m = { top: 24, right: 20, bottom: 42, left: 38 };
+      const w = width - m.left - m.right;
+      const h = height - m.top - m.bottom;
+      const max = Math.max(1, ...entries.map(e => e.value));
+      const gap = 16;
+      const barW = (w - gap * (entries.length - 1)) / entries.length;
+      ctx.strokeStyle = '#E2E8F0';
+      for (let i = 0; i <= 4; i += 1) {
+        const y = m.top + h / 4 * i;
+        ctx.beginPath();
+        ctx.moveTo(m.left, y);
+        ctx.lineTo(width - m.right, y);
+        ctx.stroke();
+      }
+      entries.forEach((entry, index) => {
+        const x = m.left + index * (barW + gap);
+        const barH = entry.value / max * h;
+        const y = m.top + h - barH;
+        ctx.fillStyle = '#FEF3C7';
+        ctx.fillRect(x, m.top, barW, h);
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, barW, barH);
+        ctx.fillStyle = COLORS.ink;
+        ctx.textAlign = 'center';
+        ctx.font = '800 13px Inter, system-ui, sans-serif';
+        ctx.fillText(numberFmt.format(entry.value), x + barW / 2, y - 10);
+        ctx.fillStyle = COLORS.gray;
+        ctx.font = '11px Inter, system-ui, sans-serif';
+        ctx.fillText(entry.label, x + barW / 2, height - 18);
+      });
+    }
+
+    function drawEmpty(chart, label) {
+      const { ctx, width, height } = chart;
+      ctx.fillStyle = '#F8FAFC';
+      ctx.fillRect(0, 0, width, height);
+      ctx.strokeStyle = '#DDE7F0';
+      ctx.strokeRect(0.5, 0.5, width - 1, height - 1);
+      ctx.fillStyle = COLORS.gray;
+      ctx.textAlign = 'center';
+      ctx.font = '12px Inter, system-ui, sans-serif';
+      ctx.fillText(label, width / 2, height / 2);
+    }
+
+    function getFlags(record) {
+      const promiseEnd = record.promiseDate ? endOfDay(record.promiseDate) : null;
+      const delayedOpen = !record.isDelivered && promiseEnd && promiseEnd.getTime() < startOfDay(app.asOf).getTime();
+      const lateDelivered = record.isDelivered && record.deliveredDate && promiseEnd && record.deliveredDate.getTime() > promiseEnd.getTime();
+      return {
+        delayedOpen: Boolean(delayedOpen),
+        lateDelivered: Boolean(lateDelivered),
+        inTransit: !record.isDelivered && /transit|dispatched|scan/i.test(`${record.status} ${record.remarks}`),
+        pending: !record.isDelivered && /pending|manifested/i.test(`${record.status} ${record.statusType}`)
+      };
+    }
+
+    function badgeFor(record) {
+      const flags = getFlags(record);
+      if (flags.delayedOpen) return { className: 'delayed', label: 'Delayed' };
+      if (record.isDelivered) return { className: 'delivered', label: 'Delivered' };
+      if (flags.inTransit) return { className: 'transit', label: 'In transit' };
+      return { className: 'pending', label: record.status || 'Open' };
+    }
+
+    function resetFilters() {
+      app.filters = { period: 'all', warehouse: 'all', state: 'all', status: 'all' };
+      dom.periodFilter.value = 'all';
+      dom.warehouseFilter.value = 'all';
+      dom.stateFilter.value = 'all';
+      dom.statusFilter.value = 'all';
+      applyFilters();
+    }
+
+    function countBy(records, getter) {
+      const map = new Map();
+      records.forEach(record => {
+        const key = getter(record) || 'Unknown';
+        map.set(key, (map.get(key) || 0) + 1);
+      });
+      return map;
+    }
+
+    function topEntries(map, limit) {
+      return Array.from(map.entries())
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .slice(0, limit)
+        .map(([label, value]) => ({ label, value }));
+    }
+
+    function commonValue(records, getter) {
+      const top = topEntries(countBy(records, getter), 1);
+      return top.length ? top[0].label : '';
+    }
+
+    function cleanCell(value) {
+      return String(value == null ? '' : value).replace(/^`/, '').trim();
+    }
+
+    function isDeliveredStatus(value) {
+      const text = cleanCell(value).toLowerCase();
+      return text === 'delivered' || text === 'delivered to consignee';
+    }
+
+    function parseNumber(value) {
+      const num = Number(String(value == null ? '' : value).replace(/[,`]/g, '').trim());
+      return Number.isFinite(num) ? num : 0;
+    }
+
+    function parseDate(value) {
+      const clean = cleanCell(value);
+      if (!clean) return null;
+      const match = clean.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?)?/);
+      if (match) {
+        return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4] || 0), Number(match[5] || 0), Number(match[6] || 0), Number((match[7] || '0').slice(0, 3)));
+      }
+      const parsed = new Date(clean);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    function getAsOfDate(records) {
+      const dates = [];
+      records.forEach(record => [record.lastScanDate, record.deliveredDate, record.pickupDate, record.manifestDate].forEach(date => date && dates.push(date)));
+      return dates.length ? new Date(Math.max(...dates.map(date => date.getTime()))) : new Date();
+    }
+
+    function dateRangeLabel(records) {
+      const dates = records.map(r => r.manifestDate || r.pickupDate || r.deliveredDate).filter(Boolean).sort((a, b) => a - b);
+      if (!dates.length) return '';
+      const first = dates[0];
+      const last = dates[dates.length - 1];
+      return first.toDateString() === last.toDateString() ? formatDate(first) : `${formatDate(first)} to ${formatDate(last)}`;
+    }
+
+    function titleCase(value) {
+      return String(value || '').toLowerCase().replace(/\b[a-z]/g, letter => letter.toUpperCase());
+    }
+
+    function sum(items, getter) {
+      return items.reduce((total, item) => total + Number(getter(item) || 0), 0);
+    }
+
+    function diffDays(start, end) {
+      return start && end ? Math.max(0, (end.getTime() - start.getTime()) / DAY) : 0;
+    }
+
+    function startOfDay(date) {
+      return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    }
+
+    function endOfDay(date) {
+      return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+    }
+
+    function formatDate(date) {
+      return date ? dateFmt.format(date) : '-';
+    }
+
+    function formatMoney(value) {
+      const amount = Number(value || 0);
+      if (Math.abs(amount) >= 10000000) return `INR ${decimalFmt.format(amount / 10000000)} Cr`;
+      if (Math.abs(amount) >= 100000) return `INR ${decimalFmt.format(amount / 100000)} L`;
+      return `INR ${moneyFmt.format(amount)}`;
+    }
+
+    function truncate(value, length) {
+      const text = String(value || '');
+      return text.length <= length ? text : `${text.slice(0, Math.max(0, length - 1))}...`;
+    }
+
+    function safeFile(value) {
+      return String(value || 'Report').replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, '_').slice(0, 70);
+    }
+
+    function escapeHtml(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function debounce(fn, wait) {
+      let timeout;
+      return (...args) => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => fn.apply(null, args), wait);
+      };
+    }
+
+    function showToast(message) {
+      dom.toast.textContent = message;
+      dom.toast.classList.add('show');
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => dom.toast.classList.remove('show'), 3200);
+    }
+
+    function createIcons() {
+      if (window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons();
+    }
+  </script>
+</body>
+</html>
