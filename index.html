@@ -526,8 +526,9 @@ async function generatePptx(){
 
   for(let i=0;i<datasets.length;i++){
     try{
-    setProgress(20+i*(60/datasets.length),`Generating ${datasets[i].client}...`);
-    const ds=datasets[i],s=ds.summary,a=ds.agg;
+    const ds=datasets[i];if(!ds||!ds.summary||!ds.agg){setProgress(100,'Skipping bad dataset');continue}
+    setProgress(20+i*(60/datasets.length),`Generating ${ds.client}...`);
+    const s=ds.summary,a=ds.agg;
     const pptx=new PptxGenJS();pptx.layout='LAYOUT_WIDE';
     pptx.author='Sonic Business Solutions';pptx.subject='MIS Dashboard Report';
 
