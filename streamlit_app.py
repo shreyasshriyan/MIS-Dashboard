@@ -16,14 +16,25 @@ import streamlit as st
 
 HERE = Path(__file__).parent
 
-st.set_page_config(page_title="Logistics Dashboard", page_icon="📊", layout="wide")
+def get_logo_b64():
+    import base64
+    p = HERE / "logo-light.png"
+    if p.exists():
+        return base64.b64encode(p.read_bytes()).decode()
+    return ""
+
+st.set_page_config(page_title="MIS Dashboard — Sonic Business Solutions", page_icon="📊", layout="wide")
 
 # ── Custom CSS for professional look ─────────────────────────────────
 st.markdown("""
 <style>
-    .block-container { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+    .block-container { padding-top: 1rem; padding-bottom: 1.5rem; }
     .stApp { background: #f4f7fb; }
-    .main-title { color: #0F172A; font-size: 28px; font-weight: 700; margin-bottom: 2px; letter-spacing: -0.3px; }
+    .brand-header { display: flex; align-items: center; gap: 16px; margin-bottom: 4px; }
+    .brand-header img { height: 44px; width: auto; }
+    .brand-header .brand-text { display: flex; flex-direction: column; }
+    .main-title { color: #0F172A; font-size: 28px; font-weight: 700; line-height: 1.2; letter-spacing: -0.3px; }
+    .company-name { color: #1E3A5F; font-size: 13px; font-weight: 600; letter-spacing: 0.3px; }
     .sub-title { color: #64748B; font-size: 14px; margin-bottom: 20px; }
     .metric-card { background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
     .metric-card .label { color: #64748B; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
@@ -58,8 +69,9 @@ def login():
     .login-wrap .stButton button{height:48px;border-radius:10px;font-weight:600;font-size:15px}
     </style>
     <div class="login-wrap">
-    <h1>Logistics Dashboard</h1>
-    <p>Sign in with your company credentials</p>
+    <h1>MIS Dashboard</h1>
+    <p style="margin:2px 0 0 0;font-size:11px;color:#94A3B8;font-weight:600;letter-spacing:0.5px">SONIC BUSINESS SOLUTIONS</p>
+    <p style="margin:12px 0 0 0">Sign in with your company credentials</p>
     </div>""", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1, 1, 1])
     with c2:
@@ -84,7 +96,15 @@ sys.path.insert(0, str(HERE))
 from app import parse_csv, build_report, generate_ppt, generate_docx, generate_pdf, fmt_num, fmt_money
 
 # ── App ───────────────────────────────────────────────────────────────
-st.markdown('<div class="main-title">Logistics Dashboard</div>', unsafe_allow_html=True)
+st.markdown(f'''
+<div class="brand-header">
+    <img src="data:image/png;base64,{get_logo_b64()}" alt="Logo">
+    <div class="brand-text">
+        <div class="main-title">MIS Dashboard</div>
+        <div class="company-name">Sonic Business Solutions</div>
+    </div>
+</div>
+''', unsafe_allow_html=True)
 st.markdown('<div class="sub-title">Multi-customer logistics reporting — upload CSV files below.</div>', unsafe_allow_html=True)
 
 uploaded = st.file_uploader("Choose CSV files", type=["csv"], accept_multiple_files=True,
