@@ -262,7 +262,7 @@ tr:hover td{background:#F8FAFC}
 
   <footer class="footer">
     Sonic Business Solutions &bull; Andheri (East), Mumbai 400069, Maharashtra, India
-    <small>&copy; 2026 Sonic Business Solutions. All rights reserved. &bull; Internal tool (v1.2 - Client-side Word & AutoTable). Unauthorised use prohibited.</small>
+    <small>&copy; 2026 Sonic Business Solutions. All rights reserved. &bull; Internal tool (v1.3 - Serverless Client-side Engine). Unauthorised use prohibited.</small>
   </footer>
 </div>
 
@@ -627,18 +627,33 @@ async function createReports(format){
   btn.disabled=true;showProgress(10,'Preparing data...');
 
   try{
+    const customUrl = $('apiUrlInput') ? $('apiUrlInput').value.trim() : '';
+    const useBackend = customUrl !== '';
+
     if(format==='ppt'){
-      const ok=await tryBackend('ppt');
+      let ok = false;
+      if (useBackend) {
+        ok = await tryBackend('ppt');
+      }
       if(!ok){await generatePptx()}
       setProgress(100,'Done!')
     }
     else if(format==='pdf'){await generatePdfReports();setProgress(100,'Done!')}
     else if(format==='word'){
-      const ok=await tryBackend('word');
+      let ok = false;
+      if (useBackend) {
+        ok = await tryBackend('word');
+      }
       if(!ok){await generateDocxReports()}
       setProgress(100,'Done!')
     }
-    else{await tryBackend(format)}
+    else{
+      if (useBackend) {
+        await tryBackend(format);
+      } else {
+        showToast('Backend-only format requires a Backend API URL.');
+      }
+    }
   }catch(e){console.error(e);showToast('Error: '+(e.message||String(e)))}
   finally{btn.disabled=false;if(typeof dom==='object'&&dom.progressOverlay)setTimeout(()=>dom.progressOverlay.classList.add('hidden'),1200)}
 }
