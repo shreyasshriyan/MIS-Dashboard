@@ -365,7 +365,21 @@ def build_report(records):
         n['amount'] = parse_num(raw.get('package amount', raw.get('declared value',
             _auto_col(raw, ['amount', 'value', 'declared', 'price']))))
         n['weight'] = parse_num(raw.get('weight', _auto_col(raw, ['weight', 'wt', 'kg'])))
-        n['attempts'] = int(parse_num(raw.get('attempt count', _auto_col(raw, ['attempt', 'retry']))))
+        # Count attempts dynamically if no explicit attempt count column exists
+        attempts_col = _auto_col(raw, ['attempt count', 'attempts', 'retry count', 'retries'])
+        attempts_val = parse_num(attempts_col)
+        if attempts_val == 0:
+            count = 0
+            has_first = any('first attempt' in k and str(raw[k]).strip() for k in raw)
+            has_second = any('second attempt' in k and str(raw[k]).strip() for k in raw)
+            has_third = any('third attempt' in k and str(raw[k]).strip() for k in raw)
+            if has_first: count += 1
+            if has_second: count += 1
+            if has_third: count += 1
+            if count == 0 and status and 'attempt' in status.lower():
+                count = 1
+            attempts_val = count
+        n['attempts'] = int(attempts_val)
         n['last_scan'] = parse_dt(raw.get('last scan date', _auto_col(raw, ['scan', 'last update'])))
         n['remarks'] = str(raw.get('remarks', raw.get('delivery failure reason',
             _auto_col(raw, ['remarks', 'reason', 'failure', 'comment'])))).strip()

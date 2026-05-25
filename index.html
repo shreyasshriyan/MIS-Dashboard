@@ -395,6 +395,23 @@ function normalizeRow(row,index,fields,schema){
   let o=g('origin'),d=g('destination'),s=g('state'),z=g('zone');
   if(schema==='customer_mis'||schema==='mis_may'||schema==='generic'){s=guessState(d);z=''}
   const boxesVal=parseNum(g('boxes'));
+
+  let attemptsCount=parseNum(g('attempts'));
+  if(attemptsCount===0){
+    let count=0;
+    const rawKeys=Object.keys(row);
+    const hasFirst=rawKeys.some(k=>k.toLowerCase().includes('first attempt')&&cleanCell(row[k]));
+    const hasSecond=rawKeys.some(k=>k.toLowerCase().includes('second attempt')&&cleanCell(row[k]));
+    const hasThird=rawKeys.some(k=>k.toLowerCase().includes('third attempt')&&cleanCell(row[k]));
+    if(hasFirst)count++;
+    if(hasSecond)count++;
+    if(hasThird)count++;
+    if(count===0&&st&&/attempt/i.test(st)){
+      count=1;
+    }
+    attemptsCount=count;
+  }
+
   return{row,index,id:g('id')||g('lrn')||`Row ${index+1}`,lrn:g('lrn'),client:titleCase(g('client'))||'Customer',
     boxes:fields.boxes?boxesVal:(boxesVal||1),warehouse:titleCase(g('warehouse'))||'Unassigned',
     manifestDate:parseDate(g('manifest')),pickupDate:parseDate(g('pickup')),expectedDate:parseDate(g('expected')),
@@ -402,7 +419,7 @@ function normalizeRow(row,index,fields,schema){
     lastScanDate:parseDate(g('lastScan')),lastScanLocation:g('lastScanLocation'),
     origin:titleCase(o)||'Unknown',destination:titleCase(d)||'Unknown',state:titleCase(s)||'Unknown',zone:z||'NA',
     status:st,statusType:stt||st,remarks:g('remarks'),amount:parseNum(g('amount')),weight:parseNum(g('weight')),
-    attempts:parseNum(g('attempts')),isDelivered:isDelivered(st)||isDelivered(stt)||Boolean(dd)}
+    attempts:attemptsCount,isDelivered:isDelivered(st)||isDelivered(stt)||Boolean(dd)}
 }
 
 // ── Build Summary & Aggregates ──
