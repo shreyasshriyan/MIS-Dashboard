@@ -1191,7 +1191,7 @@ async function tryBackend(format){
     }
   }
   
-  showToast('Backend unavailable — generating reports locally instead.');
+  console.log('Backend connection not available. Generating reports client-side...');
   return false;
 }
 
