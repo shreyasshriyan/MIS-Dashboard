@@ -197,9 +197,9 @@ tr:hover td{background:#F8FAFC}
       <article class="kpi-card blue"><div class="kpi-label">Shipments</div><div class="kpi-value" id="shipmentsMetric">0</div><div class="kpi-sub" id="shipmentsSub">No records</div></article>
       <article class="kpi-card green"><div class="kpi-label">Delivered</div><div class="kpi-value" id="deliveredMetric">0%</div><div class="kpi-sub" id="deliveredSub">0 delivered</div></article>
       <article class="kpi-card red"><div class="kpi-label">Open Delayed</div><div class="kpi-value" id="delayedMetric">0</div><div class="kpi-sub" id="delayedSub">0 late</div></article>
-      <article class="kpi-card amber"><div class="kpi-label">Package Value</div><div class="kpi-value" id="valueMetric">0</div><div class="kpi-sub" id="valueSub">Invoice value</div></article>
-      <article class="kpi-card blue"><div class="kpi-label">Boxes</div><div class="kpi-value" id="boxesMetric">0</div><div class="kpi-sub" id="boxesSub">0 kg</div></article>
-      <article class="kpi-card green"><div class="kpi-label">Avg TAT</div><div class="kpi-value" id="tatMetric">0d</div><div class="kpi-sub" id="tatSub">On-time rate</div></article>
+      <article class="kpi-card amber"><div class="kpi-label" id="valueLabel">Package Value</div><div class="kpi-value" id="valueMetric">0</div><div class="kpi-sub" id="valueSub">Invoice value</div></article>
+      <article class="kpi-card blue"><div class="kpi-label" id="boxesLabel">Boxes</div><div class="kpi-value" id="boxesMetric">0</div><div class="kpi-sub" id="boxesSub">0 kg</div></article>
+      <article class="kpi-card green"><div class="kpi-label" id="tatLabel">Avg TAT</div><div class="kpi-value" id="tatMetric">0d</div><div class="kpi-sub" id="tatSub">On-time rate</div></article>
     </section>
 
     <!-- Charts -->
@@ -454,9 +454,52 @@ function render(){
   $('shipmentsMetric').textContent=nf.format(s.shipments);$('shipmentsSub').textContent=`As of ${formatDate(app.asOf)}`;
   $('deliveredMetric').textContent=`${s.deliveredRate}%`;$('deliveredSub').textContent=`${nf.format(s.delivered)} delivered, ${nf.format(s.open)} open`;
   $('delayedMetric').textContent=nf.format(s.delayedOpen);$('delayedSub').textContent=`${nf.format(s.lateDelivered)} late delivered`;
-  $('valueMetric').textContent=s.valueLabel;$('valueSub').textContent=`${nf.format(s.attempted)} attempted`;
-  $('boxesMetric').textContent=nf.format(s.boxes);$('boxesSub').textContent=`${s.weightLabel} total`;
-  $('tatMetric').textContent=s.avgTatLabel;$('tatSub').textContent=`${s.onTimeRate}% on-time`;
+  const has_amount = s.amount > 0;
+  const has_weight = s.weight > 0;
+  const has_boxes = app.filtered.some(r => r.boxes > 1);
+  const has_tat = s.avgTat > 0;
+
+  if (has_amount) {
+    $('valueLabel').textContent = 'Package Value';
+    $('valueMetric').textContent = s.valueLabel;
+    $('valueSub').textContent = `${nf.format(s.attempted)} attempted`;
+  } else if (has_weight) {
+    $('valueLabel').textContent = 'Total Weight';
+    $('valueMetric').textContent = s.weightLabel;
+    $('valueSub').textContent = 'Total cargo weight';
+  } else {
+    $('valueLabel').textContent = 'Shipments';
+    $('valueMetric').textContent = nf.format(s.shipments);
+    $('valueSub').textContent = 'Total consignment count';
+  }
+
+  if (has_boxes) {
+    $('boxesLabel').textContent = 'Boxes';
+    $('boxesMetric').textContent = nf.format(s.boxes);
+    $('boxesSub').textContent = `${s.weightLabel} total`;
+  } else if (has_weight && !has_amount) {
+    $('boxesLabel').textContent = 'Shipments';
+    $('boxesMetric').textContent = nf.format(s.shipments);
+    $('boxesSub').textContent = 'Consignment volume';
+  } else if (has_weight) {
+    $('boxesLabel').textContent = 'Total Weight';
+    $('boxesMetric').textContent = s.weightLabel;
+    $('boxesSub').textContent = 'Total cargo weight';
+  } else {
+    $('boxesLabel').textContent = 'Shipments Handled';
+    $('boxesMetric').textContent = nf.format(s.shipments);
+    $('boxesSub').textContent = 'No package detail';
+  }
+
+  if (has_tat) {
+    $('tatLabel').textContent = 'Avg TAT';
+    $('tatMetric').textContent = s.avgTatLabel;
+    $('tatSub').textContent = `${s.onTimeRate}% on-time`;
+  } else {
+    $('tatLabel').textContent = 'On-Time Rate';
+    $('tatMetric').textContent = `${s.onTimeRate}%`;
+    $('tatSub').textContent = 'Based on promise date';
+  }
   $('statusNote').textContent=`${nf.format(s.open)} open`;$('agingNote').textContent=`Aging as of ${formatDate(app.asOf)}`;
   $('priorityNote').textContent=`${nf.format(s.delayedOpen)} delayed`;
   try{renderCharts(a)}catch(e){}
@@ -672,11 +715,46 @@ async function generatePptx(){
     sectionHeader(sl,0.5,0.15,10,'Operational Performance & Efficiency');
     sl.addShape('line',{x:0.5,y:0.58,w:'90%',h:0,line:{color:BORDER,width:0.5}});
     
-    // 4 KPI cards row at y = 1.1
-    [{label:'Package Value',val:s.valueLabel,sub:'Declared value',i:0},
-     {label:'Total Boxes',val:nf.format(s.boxes),sub:s.weightLabel,i:1},
-     {label:'Avg TAT',val:s.avgTatLabel,sub:'Pickup to delivery',i:2},
-     {label:'Attempted',val:nf.format(s.attempted),sub:'Delivery attempts',i:3}].forEach((k,j)=>kpiCard(sl,0.5+j*3.1,1.1,2.9,k));
+    const has_amount = s.amount > 0;
+    const has_weight = s.weight > 0;
+    const has_boxes = ds.records.some(r => r.boxes > 1);
+    const has_tat = s.avgTat > 0;
+    const has_attempts = s.attempted > 0;
+
+    const op_kpis = [];
+    if(has_amount) {
+      op_kpis.push({label:'Package Value',val:s.valueLabel,sub:'Declared invoice value',i:0});
+    } else if(has_weight) {
+      op_kpis.push({label:'Total Weight',val:s.weightLabel,sub:'Total cargo weight',i:0});
+    } else {
+      op_kpis.push({label:'Shipments',val:nf.format(s.shipments),sub:'Total consignment count',i:0});
+    }
+
+    if(has_boxes) {
+      op_kpis.push({label:'Total Boxes',val:nf.format(s.boxes),sub:has_weight ? s.weightLabel : 'Total packages',i:1});
+    } else if(has_weight && !has_amount) {
+      op_kpis.push({label:'Shipments',val:nf.format(s.shipments),sub:'Consignment volume',i:1});
+    } else if(has_weight) {
+      op_kpis.push({label:'Total Weight',val:s.weightLabel,sub:'Total cargo weight',i:1});
+    } else {
+      op_kpis.push({label:'Shipments Handled',val:nf.format(s.shipments),sub:'No package detail',i:1});
+    }
+
+    if(has_tat) {
+      op_kpis.push({label:'Avg TAT',val:s.avgTatLabel,sub:`${s.onTimeRate}% on-time delivery`,i:2});
+    } else {
+      op_kpis.push({label:'On-Time Rate',val:`${s.onTimeRate}%`,sub:'Based on promise date',i:2});
+    }
+
+    if(has_attempts) {
+      op_kpis.push({label:'Attempted',val:nf.format(s.attempted),sub:'Shipments with delivery retry',i:3});
+    } else if(s.delayedOpen > 0) {
+      op_kpis.push({label:'Open Delayed',val:nf.format(s.delayedOpen),sub:'SLA breach - action required',i:3});
+    } else {
+      op_kpis.push({label:'Pending Delivery',val:nf.format(s.open),sub:'Open consignments',i:3});
+    }
+
+    op_kpis.forEach((k,j)=>kpiCard(sl,0.5+j*3.1,1.1,2.9,k));
 
     // Left Open Shipment Aging Table
     sl.addText('Open Shipment Aging Bucket Analysis',{x:0.55,y:2.35,w:5.8,h:0.3,fontSize:11,fontFace:'Arial',color:NAVY,bold:true});
@@ -725,11 +803,19 @@ async function generatePptx(){
     const healthItems = [
       `Overall Delivery Performance: ${s.deliveredRate}% closure rate.`,
       `SLA Adherence (On-Time Rate): ${s.onTimeRate}% of shipments met promise date.`,
-      `Average Turnaround Time: ${s.avgTatLabel} from manifest to delivery.`,
-      `Total Financial Value: ${s.valueLabel} declared package invoice value.`,
-      `Consignments Past Promise: ${nf.format(s.delayedOpen)} shipments require immediate update.`,
-      `Total Logistics Weight Handled: ${s.weightLabel} across all consignments.`
+      `Average Turnaround Time: ${s.avgTatLabel} from manifest to delivery.`
     ];
+    if(has_amount) {
+      healthItems.push(`Total Financial Value: ${s.valueLabel} declared package invoice value.`);
+    } else {
+      healthItems.push(`Total Shipments Handled: ${nf.format(s.shipments)} consignments.`);
+    }
+    healthItems.push(`Consignments Past Promise: ${nf.format(s.delayedOpen)} shipments require immediate update.`);
+    if(has_weight) {
+      healthItems.push(`Total Logistics Weight Handled: ${s.weightLabel} across all consignments.`);
+    } else if(has_boxes) {
+      healthItems.push(`Total Packages Handled: ${nf.format(s.boxes)} boxes.`);
+    }
     
     sl.addShape('roundRect',{x:7.35,y:1.5,w:5.4,h:5.0,fill:{color:BG},line:{color:BORDER,width:0.5},rectRadius:0.05});
     sl.addShape('roundRect',{x:7.35,y:1.5,w:0.06,h:5.0,fill:{color:'059669'},rectRadius:0.05});

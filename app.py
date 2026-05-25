@@ -614,10 +614,49 @@ def generate_ppt(report):
     # ── Slide 4: Operational Performance ──
     sl = prs.slides.add_slide(prs.slide_layouts[6])
     header(sl, 'Operational Performance & Efficiency', report['period'], 'Turnaround time, invoice values, and shipment aging')
-    kpi(sl, [('Package Value', report['value_label'], 'Declared invoice value'),
-             ('Total Boxes', fmt_num(report['total_boxes']), report['weight_label']),
-             ('Avg TAT', report['avg_tat_label'], 'Pickup to delivery'),
-             ('Attempted', fmt_num(report['attempted']), 'With attempt')], Inches(1.1))
+    
+    # Content dynamic operational KPIs selection
+    has_amount = report['total_amount'] > 0
+    has_weight = report['total_weight'] > 0
+    has_boxes = any(r['boxes'] > 1 for r in report['records'])
+    has_tat = report['avg_tat'] > 0
+    has_attempts = report['attempted'] > 0
+
+    op_kpis = []
+    # 1. Financial / Weight / Shipment Count
+    if has_amount:
+        op_kpis.append(('Package Value', report['value_label'], 'Declared invoice value'))
+    elif has_weight:
+        op_kpis.append(('Total Weight', report['weight_label'], 'Total cargo weight'))
+    else:
+        op_kpis.append(('Shipments', fmt_num(report['shipments']), 'Total consignment count'))
+
+    # 2. Package Count / Weight / volume
+    if has_boxes:
+        op_kpis.append(('Total Boxes', fmt_num(report['total_boxes']), report['weight_label'] if has_weight else 'Total packages'))
+    elif has_weight and (not has_amount):
+        op_kpis.append(('Shipments', fmt_num(report['shipments']), 'Consignment volume'))
+    elif has_weight:
+        op_kpis.append(('Total Weight', report['weight_label'], 'Total cargo weight'))
+    else:
+        op_kpis.append(('Shipments Handled', fmt_num(report['shipments']), 'No package detail'))
+
+    # 3. TAT / SLA
+    if has_tat:
+        op_kpis.append(('Avg TAT', report['avg_tat_label'], f"{report['on_time_rate']}% on-time delivery"))
+    else:
+        op_kpis.append(('On-Time Rate', f"{report['on_time_rate']}%", 'Based on promise date'))
+
+    # 4. Operations / Exceptions
+    if has_attempts:
+        op_kpis.append(('Attempted', fmt_num(report['attempted']), 'Shipments with delivery retry'))
+    elif report['open_delayed'] > 0:
+        op_kpis.append(('Open Delayed', fmt_num(report['open_delayed']), 'SLA breach - action required'))
+    else:
+        op_kpis.append(('Pending Delivery', fmt_num(report['open']), 'Open consignments'))
+
+    kpi(sl, op_kpis, Inches(1.1))
+    
     txt(sl, Inches(0.55), Inches(2.35), Inches(5.8), Inches(0.3), 'Open Shipment Aging Bucket Analysis', 11, True, NAVY)
     ar = [['Aging Bucket', 'Count', 'Required Operational Action']]
     for lb, vl in sorted(report['aging'].items()):
@@ -650,14 +689,23 @@ def generate_ppt(report):
         lr.append([lane[:46], fmt_num(count), fmt_num(ld), fmt_num(count-ld), f'{rt}%'])
     tbl(sl, lr, Inches(0.55), Inches(1.5), Inches(6.2), Inches(5.0), [2.8, 0.85, 0.85, 0.85, 0.85])
     txt(sl, Inches(7.35), Inches(1.1), Inches(5.4), Inches(0.3), 'Operational Delivery Health Summary', 11, True, NAVY)
+    
+    # Dynamic operational delivery health list
     health_items = [
         f"Overall Delivery Performance: {report['delivered_rate']}% closure rate.",
         f"SLA Adherence (On-Time Rate): {report['on_time_rate']}% of shipments met promise date.",
-        f"Average Turnaround Time: {report['avg_tat_label']} from manifest to delivery.",
-        f"Total Financial Value: {report['value_label']} declared package invoice value.",
-        f"Consignments Past Promise: {fmt_num(report['open_delayed'])} shipments require immediate update.",
-        f"Total Logistics Weight Handled: {report['weight_label']} across all consignments."
+        f"Average Turnaround Time: {report['avg_tat_label']} from manifest to delivery."
     ]
+    if has_amount:
+        health_items.append(f"Total Financial Value: {report['value_label']} declared package invoice value.")
+    else:
+        health_items.append(f"Total Shipments Handled: {fmt_num(report['shipments'])} consignments.")
+    health_items.append(f"Consignments Past Promise: {fmt_num(report['open_delayed'])} shipments require immediate update.")
+    if has_weight:
+        health_items.append(f"Total Logistics Weight Handled: {report['weight_label']} across all consignments.")
+    elif has_boxes:
+        health_items.append(f"Total Packages Handled: {fmt_num(report['total_boxes'])} boxes.")
+    
     callout(sl, Inches(7.35), Inches(1.5), Inches(5.4), Inches(5.0), 'Logistics Performance Indicators', health_items, RGBColor(0x05, 0x96, 0x69))
     footer(sl, report['generated'], report['client'])
 
@@ -709,9 +757,30 @@ def generate_docx(report):
     doc.add_paragraph().add_run().add_break()
 
     doc.add_heading('Performance Summary', level=1)
+    
+    has_amount = report['total_amount'] > 0
+    has_weight = report['total_weight'] > 0
+    has_boxes = any(r['boxes'] > 1 for r in report['records'])
+    has_tat = report['avg_tat'] > 0
+
+    kpi_parts = []
+    if has_amount:
+        kpi_parts.append(f"Package Value: {report['value_label']}")
+    if has_boxes:
+        kpi_parts.append(f"Total Boxes: {fmt_num(report['total_boxes'])}")
+    if has_weight:
+        kpi_parts.append(f"Weight: {report['weight_label']}")
+    if has_tat:
+        kpi_parts.append(f"Avg TAT: {report['avg_tat_label']}")
+    
+    if not kpi_parts:
+        kpi_parts.append(f"Volume: {fmt_num(report['shipments'])} shipments")
+
+    kpi_line2 = "  |  ".join(kpi_parts)
+
     kpi_data = [
         f"Total Shipments: {fmt_num(report['shipments'])}  |  Delivered: {report['delivered_rate']}%  |  On-Time: {report['on_time_rate']}%  |  Open: {fmt_num(report['open'])}",
-        f"Package Value: {report['value_label']}  |  Total Boxes: {fmt_num(report['total_boxes'])}  |  Weight: {report['weight_label']}  |  Avg TAT: {report['avg_tat_label']}",
+        kpi_line2,
         f"Attempted: {fmt_num(report['attempted'])}  |  Late Delivered: {fmt_num(report['late_delivered'])}  |  Open Delayed: {fmt_num(report['open_delayed'])}"
     ]
     for kd in kpi_data:
