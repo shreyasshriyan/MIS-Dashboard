@@ -546,8 +546,8 @@ def generate_ppt(report):
 
     def footer(sl, text, client):
         rect(sl, 0, Inches(6.92), sw, Inches(0.01), RGBColor(0xCB,0xD5,0xE1))
-        txt(sl, M, Inches(6.95), Inches(10.6), Inches(0.16), text or '', 7, False, LGRAY)
-        txt(sl, Inches(11.25), Inches(6.95), Inches(1.65), Inches(0.16), client or 'Logistics', 7, True, NAVY, PP_ALIGN.RIGHT)
+        txt(sl, M, Inches(6.95), Inches(7.5), Inches(0.16), text or '', 7, False, LGRAY)
+        txt(sl, Inches(8), Inches(6.95), Inches(4.9), Inches(0.16), '\u00a9 2026 Sonic Business Solutions \u2022 Confidential', 7, False, LGRAY, PP_ALIGN.RIGHT)
 
     def callout(sl, x, y, w, h, title, items, accent=BLUE):
         rect(sl, x, y, w, h, RGBColor(0xF8,0xFA,0xFC), RGBColor(0xDD,0xE7,0xF0))
@@ -690,7 +690,9 @@ def generate_docx(report):
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER if level == 0 else WD_ALIGN_PARAGRAPH.LEFT
         for r in p.runs: r.font.color.rgb = DocRGB(*bytes.fromhex(color))
 
-    add_heading('MIS DASHBOARD — SONIC BUSINESS SOLUTIONS', 0)
+    add_heading('MIS DASHBOARD \u2014 SONIC BUSINESS SOLUTIONS', 0)
+    p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r = p.add_run('Andheri (East), Mumbai 400069, Maharashtra, India'); r.font.size = DocPt(8); r.font.color.rgb = DocRGB(0x64,0x74,0x8B)
     p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     r = p.add_run(report['client']); r.bold = True; r.font.size = DocPt(18); r.font.color.rgb = DocRGB(0x25,0x63,0xEB)
     p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -766,7 +768,10 @@ class LogisticsPDF(FPDF):
     def header(self):
         self.set_font('Helvetica', 'B', 8)
         self.set_text_color(0x1E, 0x3A, 0x5F)
-        self.cell(0, 6, 'SONIC BUSINESS SOLUTIONS - MIS DASHBOARD', align='C'); self.ln(8)
+        self.cell(0, 6, 'SONIC BUSINESS SOLUTIONS - MIS DASHBOARD', align='C'); self.ln(4)
+        self.set_font('Helvetica', '', 6)
+        self.set_text_color(0x94, 0xA3, 0xB8)
+        self.cell(0, 4, 'Andheri (East), Mumbai 400069, Maharashtra, India', align='C'); self.ln(8)
         self.set_draw_color(0x25, 0x63, 0xEB); self.set_line_width(0.5)
         self.line(10, self.get_y(), 200, self.get_y()); self.ln(4)
     def footer(self):

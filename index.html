@@ -135,7 +135,8 @@ tr:hover td{background:#F8FAFC}
 .progress-fill{height:100%;width:0%;border-radius:3px;background:var(--blue);transition:width .2s}
 
 /* ── Footer ── */
-.footer{text-align:center;color:var(--muted);font-size:11px;margin-top:32px;padding-top:16px;border-top:1px solid var(--border)}
+.footer{text-align:center;color:var(--slate);font-size:11px;margin-top:40px;padding:20px 0 4px;border-top:1px solid var(--border);line-height:1.7}
+.footer small{display:block;color:var(--muted);font-size:10px;margin-top:2px}
 
 @media(max-width:1200px){.kpis{grid-template-columns:repeat(3,1fr)}.main-grid{grid-template-columns:1fr}}
 @media(max-width:860px){.upload-row,.filters,.charts-grid{grid-template-columns:1fr}.brand-bar{flex-direction:column;align-items:flex-start;gap:12px}.kpis{grid-template-columns:1fr 1fr}.brand-right{width:100%;flex-wrap:wrap}}
@@ -149,7 +150,7 @@ tr:hover td{background:#F8FAFC}
       <img src="logo-light.png" alt="Logo" class="brand-logo" onerror="this.style.display='none'">
       <div>
         <div class="brand-title">MIS Dashboard</div>
-        <div class="brand-sub">Sonic Business Solutions</div>
+        <div class="brand-sub">Sonic Business Solutions &bull; Andheri (East), Mumbai 400069</div>
       </div>
     </div>
     <div class="brand-right">
@@ -252,6 +253,11 @@ tr:hover td{background:#F8FAFC}
   <section id="emptyState" class="empty-state">
     <div><strong>No logistics CSVs loaded yet.</strong><p>Drop CSV files above or click to browse.</p></div>
   </section>
+
+  <footer class="footer">
+    Sonic Business Solutions &bull; Andheri (East), Mumbai 400069, Maharashtra, India
+    <small>&copy; 2026 Sonic Business Solutions. All rights reserved. &bull; Internal tool. Unauthorised use prohibited.</small>
+  </footer>
 </div>
 
 <div id="toast" class="toast"></div>
@@ -569,7 +575,7 @@ async function generatePptx(){
     pptx.author='Sonic Business Solutions';pptx.subject='MIS Dashboard Report';
 
     const genDate=new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
-    const footer=sl=>{sl.addShape('line',{x:0.5,y:6.85,w:'90%',h:0,line:{color:BORDER,width:0.5}});sl.addText(`Generated ${genDate} — Sonic Business Solutions`,{x:0.5,y:6.88,w:6,h:0.22,fontSize:7,fontFace:'Arial',color:LGRAY});sl.addText(ds.client,{x:9,y:6.88,w:4,h:0.22,fontSize:7,fontFace:'Arial',color:NAVY,bold:true,align:'right'})};
+    const footer=sl=>{sl.addShape('line',{x:0.5,y:6.82,w:'90%',h:0,line:{color:BORDER,width:0.5}});sl.addText(`\u00a9 2026 Sonic Business Solutions \u2022 Confidential`,{x:0.5,y:6.85,w:6,h:0.22,fontSize:7,fontFace:'Arial',color:LGRAY});sl.addText(ds.client,{x:9,y:6.85,w:4,h:0.22,fontSize:7,fontFace:'Arial',color:NAVY,bold:true,align:'right'})};
     const sectionHeader=(sl,x,y,w,title,color)=>{sl.addShape('roundRect',{x,y,w:0.06,h:0.32,fill:{color:color||BLUE}});sl.addText(title,{x:x+0.18,y,w:w,h:0.3,fontSize:13,fontFace:'Arial',color:DARK,bold:true})};
     const kpiCard=(sl,x,y,w,k)=>{sl.addShape('roundRect',{x,y,w:w,h:0.92,fill:{color:BG},line:{color:BORDER,width:0.5},rectRadius:0.08});sl.addShape('roundRect',{x,y,w:0.06,h:0.92,fill:{color:KPI_COLORS[k.i]},rectRadius:0.06});sl.addText(k.val,{x:x+0.15,y:y+0.08,w:w-0.2,h:0.28,fontSize:17,fontFace:'Arial',color:DARK,bold:true});sl.addText(k.label,{x:x+0.15,y:y+0.42,w:w-0.2,h:0.18,fontSize:7.5,fontFace:'Arial',color:'475569',bold:true});sl.addText(k.sub,{x:x+0.15,y:y+0.62,w:w-0.2,h:0.18,fontSize:7,fontFace:'Arial',color:GRAY})};
     const makeTbl=(rows,colW,opts)=>{return{rows:rows.map((r,ri)=>ri===0?r.map(c=>({text:c,options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:8}})):r.map(c=>({text:c,options:{fontSize:8,fill:ri%2===0?{color:BG}:undefined}}))),options:{fontSize:8,fontFace:'Arial',border:{color:BORDER,pt:0.5},colW:colW||[],rowH:0.32,...opts}}};
@@ -753,7 +759,7 @@ async function generatePdfReports(){
 
     // ── Footer ──
     pdf.setFontSize(7);pdf.setTextColor(148,163,184);
-    pdf.text(`Generated ${new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}  —  Sonic Business Solutions`,W/2,290,{align:'center'});
+    pdf.text(`\u00a9 2026 Sonic Business Solutions. All rights reserved.  •  Confidential`,W/2,290,{align:'center'});
 
     const fileName=`${safeFile(ds.client)}_MIS_Report.pdf`;
     setProgress(80,`Saving ${ds.client}...`);
