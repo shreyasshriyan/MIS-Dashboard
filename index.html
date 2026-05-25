@@ -8,6 +8,8 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script src="vendor/pptxgen.bundle.js"></script>
 <script src="vendor/jspdf.umd.min.js"></script>
+<script src="vendor/jspdf.plugin.autotable.min.js"></script>
+<script src="vendor/docx.min.js"></script>
 <script src="vendor/lucide.min.js"></script>
 <style>
 :root {
@@ -631,6 +633,11 @@ async function createReports(format){
       setProgress(100,'Done!')
     }
     else if(format==='pdf'){await generatePdfReports();setProgress(100,'Done!')}
+    else if(format==='word'){
+      const ok=await tryBackend('word');
+      if(!ok){await generateDocxReports()}
+      setProgress(100,'Done!')
+    }
     else{await tryBackend(format)}
   }catch(e){console.error(e);showToast('Error: '+(e.message||String(e)))}
   finally{btn.disabled=false;if(typeof dom==='object'&&dom.progressOverlay)setTimeout(()=>dom.progressOverlay.classList.add('hidden'),1200)}
@@ -963,6 +970,187 @@ async function generatePdfReports(){
     const fileName=`${safeFile(ds.client)}_MIS_Report.pdf`;
     setProgress(80,`Saving ${ds.client}...`);
     pdf.save(fileName);
+  }
+}
+
+// ── Word Generation (Client-side with docx.js) ──
+async function generateDocxReports(){
+  if(typeof window.docx==='undefined'){showToast('Word library unavailable. Check your internet connection.');throw new Error('docx.js not loaded')}
+  setProgress(15,'Creating Word Doc...');
+  const datasets=app.datasets.map(ds=>{const r=buildSummary(ds.records);const a=buildAggregates(ds.records);return{...ds,summary:r,agg:a}});
+  if(app.datasets.length>=2){const m=getMergedRecords();datasets.push({source:'merged',client:'All Customers (Consolidated)',records:m,summary:buildSummary(m),agg:buildAggregates(m)})}
+
+  const { Document, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, HeadingLevel, Packer } = window.docx;
+
+  for(let i=0;i<datasets.length;i++){
+    setProgress(15+i*(60/datasets.length),`Generating Word Doc for ${datasets[i].client}...`);
+    const ds=datasets[i],s=ds.summary,a=ds.agg;
+
+    const children = [];
+
+    // Header Title
+    children.push(new Paragraph({
+      alignment: AlignmentType.CENTER,
+      children: [
+        new TextRun({ text: "MIS DASHBOARD — SONIC BUSINESS SOLUTIONS\n", bold: true, size: 22, color: "1E3A5F" }),
+        new TextRun({ text: "Andheri (East), Mumbai 400069, Maharashtra, India\n", size: 16, color: "64748B" }),
+        new TextRun({ text: ds.client + "\n", bold: true, size: 36, color: "2563EB" }),
+        new TextRun({ text: `Period: ${s.period || 'Selected Period'}`, size: 20, color: "64748B" })
+      ],
+      spacing: { after: 300 }
+    }));
+
+    // Performance Summary Heading
+    children.push(new Paragraph({
+      heading: HeadingLevel.HEADING_1,
+      children: [new TextRun({ text: "Performance Summary", bold: true, size: 28, color: "1E3A5F" })],
+      spacing: { before: 200, after: 100 }
+    }));
+
+    // Performance Summary KPI lines
+    children.push(new Paragraph({
+      children: [
+        new TextRun({ text: `Total Shipments: ${nf.format(s.shipments)}  |  Delivered: ${s.deliveredRate}%  |  On-Time: ${s.onTimeRate}%  |  Open: ${nf.format(s.open)}\n`, size: 18 }),
+      ],
+      spacing: { after: 100 }
+    }));
+
+    // KPI Line 2 (dynamic!)
+    const has_amount = s.amount > 0;
+    const has_weight = s.weight > 0;
+    const has_boxes = ds.records.some(r => r.boxes > 1);
+    const has_tat = s.avgTat > 0;
+    const kpiParts = [];
+    if (has_amount) kpiParts.push(`Package Value: ${s.valueLabel}`);
+    if (has_boxes) kpiParts.push(`Total Boxes: ${nf.format(s.boxes)}`);
+    if (has_weight) kpiParts.push(`Weight: ${s.weightLabel}`);
+    if (has_tat) kpiParts.push(`Avg TAT: ${s.avgTatLabel}`);
+    if (!kpiParts.length) kpiParts.push(`Volume: ${nf.format(s.shipments)} shipments`);
+    const kpiLine2 = kpiParts.join("  |  ");
+
+    children.push(new Paragraph({
+      children: [
+        new TextRun({ text: kpiLine2 + "\n", size: 18 }),
+      ],
+      spacing: { after: 100 }
+    }));
+
+    children.push(new Paragraph({
+      children: [
+        new TextRun({ text: `Attempted: ${nf.format(s.attempted)}  |  Late Delivered: ${nf.format(s.lateDelivered)}  |  Open Delayed: ${nf.format(s.delayedOpen)}`, size: 18 }),
+      ],
+      spacing: { after: 200 }
+    }));
+
+    // Executive Summary Heading
+    children.push(new Paragraph({
+      heading: HeadingLevel.HEADING_1,
+      children: [new TextRun({ text: "Executive Summary", bold: true, size: 28, color: "1E3A5F" })],
+      spacing: { before: 200, after: 100 }
+    }));
+
+    // Insights bullets
+    const insights = [
+      `${s.deliveredRate}% closure across ${nf.format(s.shipments)} shipments — ${nf.format(s.open)} remain open.`,
+      `${s.onTimeRate}% on-time delivery rate — ${nf.format(s.lateDelivered)} late delivered.`,
+      `${nf.format(s.delayedOpen)} shipments past promise date — require immediate updates.`,
+      a.states.length ? `${a.states[0].label} is the top destination state.` : '',
+      a.lanes.length ? `Top lane: ${a.lanes[0].label}.` : ''
+    ].filter(Boolean);
+
+    insights.forEach(ins => {
+      children.push(new Paragraph({
+        bullet: { level: 0 },
+        children: [new TextRun({ text: ins, size: 18, color: "334155" })],
+        spacing: { after: 80 }
+      }));
+    });
+
+    // Helper to build docx Table
+    const buildDocxTable = (headers, rows, widths) => {
+      return new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: [
+          new TableRow({
+            children: headers.map((h, idx) => new TableCell({
+              children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, size: 18, color: "FFFFFF" })] })],
+              fill: "1E3A5F",
+              width: widths ? { size: widths[idx], type: WidthType.PERCENTAGE } : undefined
+            }))
+          }),
+          ...rows.map((row, rIdx) => new TableRow({
+            children: row.map((cellText, idx) => new TableCell({
+              children: [new Paragraph({ children: [new TextRun({ text: String(cellText), size: 18, color: "334155" })] })],
+              fill: rIdx % 2 === 0 ? "F8FAFC" : undefined,
+              width: widths ? { size: widths[idx], type: WidthType.PERCENTAGE } : undefined
+            }))
+          }))
+        ],
+        spacing: { after: 300 }
+      });
+    };
+
+    // Status Table
+    children.push(new Paragraph({
+      heading: HeadingLevel.HEADING_2,
+      children: [new TextRun({ text: "Status Breakdown", bold: true, size: 24, color: "1E3A5F" })],
+      spacing: { before: 200, after: 100 }
+    }));
+    const stRows = a.status.map(e => [e.label, nf.format(e.value), `${Math.round(e.value / s.shipments * 100)}%`]);
+    children.push(buildDocxTable(["Status", "Count", "Share"], stRows, [50, 25, 25]));
+
+    // Aging Table
+    children.push(new Paragraph({
+      heading: HeadingLevel.HEADING_2,
+      children: [new TextRun({ text: "Open Shipment Aging", bold: true, size: 24, color: "1E3A5F" })],
+      spacing: { before: 200, after: 100 }
+    }));
+    const agRows = a.aging.map((e, idx) => [e.label, nf.format(e.value), ["Monitor", "Follow-up", "Follow-up", "Immediate Escalation"][idx]]);
+    children.push(buildDocxTable(["Aging Bucket", "Count", "Action Required"], agRows, [40, 30, 30]));
+
+    // Destinations Table
+    if (a.states.length) {
+      children.push(new Paragraph({
+        heading: HeadingLevel.HEADING_2,
+        children: [new TextRun({ text: "Top Destination States", bold: true, size: 24, color: "1E3A5F" })],
+        spacing: { before: 200, after: 100 }
+      }));
+      const stateRows = a.states.slice(0, 8).map(e => [e.label, nf.format(e.value), `${Math.round(e.value / s.shipments * 100)}%`]);
+      children.push(buildDocxTable(["State", "Shipment Count", "Share"], stateRows, [50, 25, 25]));
+    }
+
+    // Top Lanes Table
+    if (a.lanes.length) {
+      children.push(new Paragraph({
+        heading: HeadingLevel.HEADING_2,
+        children: [new TextRun({ text: "Top Shipping Lanes", bold: true, size: 24, color: "1E3A5F" })],
+        spacing: { before: 200, after: 100 }
+      }));
+      const laneRows = a.lanes.slice(0, 8).map(l => {
+        const laneRecs = ds.records.filter(r => `${r.origin} -> ${r.destination}` === l.label);
+        const ld = laneRecs.filter(r => r.isDelivered).length;
+        const rt = l.value ? Math.round(ld / l.value * 100) : 0;
+        return [l.label, nf.format(l.value), nf.format(ld), `${rt}%`];
+      });
+      children.push(buildDocxTable(["Lane (Origin -> Destination)", "Shipments", "Delivered", "Delivery Rate"], laneRows, [40, 20, 20, 20]));
+    }
+
+    // Assemble the document
+    const doc = new Document({
+      sections: [{
+        properties: {},
+        children: children
+      }]
+    });
+
+    const blob = await Packer.toBlob(doc);
+    const fileName = `${safeFile(ds.client)}_MIS_Report.docx`;
+    const url = URL.createObjectURL(blob);
+    const downloadLink = document.createElement("a");
+    downloadLink.href = url;
+    downloadLink.download = fileName;
+    downloadLink.click();
+    URL.revokeObjectURL(url);
   }
 }
 
