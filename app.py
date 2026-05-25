@@ -90,7 +90,9 @@ def safe_text(t):
 @app.route('/')
 @require_auth
 def index():
-    return send_file(str(HERE / 'index.html'))
+    resp = app.make_response(send_file(str(HERE / 'index.html')))
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    return resp
 
 @app.route('/api/generate', methods=['POST', 'OPTIONS'])
 def api_generate():

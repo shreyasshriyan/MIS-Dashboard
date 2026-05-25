@@ -256,7 +256,7 @@ tr:hover td{background:#F8FAFC}
 
   <footer class="footer">
     Sonic Business Solutions &bull; Andheri (East), Mumbai 400069, Maharashtra, India
-    <small>&copy; 2026 Sonic Business Solutions. All rights reserved. &bull; Internal tool. Unauthorised use prohibited.</small>
+    <small>&copy; 2026 Sonic Business Solutions. All rights reserved. &bull; Internal tool (v1.1 - Clean 6-Slide Layout). Unauthorised use prohibited.</small>
   </footer>
 </div>
 
@@ -851,9 +851,13 @@ async function tryBackend(format){
   setProgress(20,'Connecting to server...');
   const fd=new FormData();app.uploadedFiles.forEach(f=>fd.append('files',f,f.name));fd.append('format',format);
   
-  // Try local Flask server first if not hosted on same origin
+  // Try local Flask server and standard Render production fallbacks if not hosted on same origin
   const apiUrls = ['/api/generate'];
-  if (window.location.origin === 'null' || window.location.protocol === 'file:' || !window.location.port || window.location.port !== '5000') {
+  apiUrls.push('http://127.0.0.1:5000/api/generate');
+  apiUrls.push('http://localhost:5000/api/generate');
+  apiUrls.push('https://logistics-dashboard.onrender.com/api/generate');
+  apiUrls.push('https://mis-dashboard.onrender.com/api/generate');
+  if (window.location.protocol === 'file:') {
     apiUrls.unshift('http://127.0.0.1:5000/api/generate');
   }
 
