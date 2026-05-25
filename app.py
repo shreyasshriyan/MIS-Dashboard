@@ -111,7 +111,7 @@ def api_generate():
             client = ''
             for k in records[0]:
                 kl = k.lower().strip()
-                if kl in ('client', 'customer code', 'customer'):
+                if kl in ('client', 'customer code', 'customer', 'network'):
                     client = str(records[0].get(k, '')).replace('`', '').strip().title()
                     break
             if not client:
@@ -196,6 +196,9 @@ def parse_dt(v):
     m = re.match(r'(\d{4})-(\d{2})-(\d{2})', s)
     if m:
         return datetime(int(m[1]), int(m[2]), int(m[3]))
+    m = re.match(r'(\d{2})-(\d{2})-(\d{4})', s)
+    if m:
+        return datetime(int(m[3]), int(m[2]), int(m[1]))
     return None
 
 def guess_state(city):
@@ -215,32 +218,48 @@ def safe_filename(name):
 
 # ── Report Builder ───────────────────────────────────────────────────
 
+def _auto_col(raw, patterns):
+    for p in patterns:
+        for k in raw:
+            if p in k:
+                return str(raw.get(k, '')).strip()
+    return ''
+
 def build_report(records):
     normalized = []
     for r in records:
         raw = {k.lower().strip(): v for k, v in r.items()}
         n = {}
-        n['id'] = str(raw.get('order id', raw.get('reference number', raw.get('lrn', '')))).replace('`', '').strip()
-        n['client'] = str(raw.get('client', raw.get('customer code', raw.get('customer', '')))).replace('`', '').strip()
-        n['boxes'] = parse_num(raw.get('no of boxes', raw.get('num pieces', '0')))
-        n['origin'] = str(raw.get('origin city', raw.get('sender city', ''))).strip().title()
-        n['dest'] = str(raw.get('destination city', raw.get('consignee city', ''))).strip().title()
-        wh = str(raw.get('client location/warehouse', raw.get('origin hub name', ''))).strip()
+        id_raw = str(raw.get('order id', raw.get('reference number', raw.get('lr no', '')))).replace('`', '').strip()
+        n['id'] = id_raw or _auto_col(raw, ['order', 'reference', 'lr no', 'lrn', 'tracking', 'awb', 'waybill', 'shipment'])
+        client_raw = str(raw.get('client', raw.get('customer code', raw.get('customer', '')))).replace('`', '').strip()
+        n['client'] = client_raw or _auto_col(raw, ['client', 'customer', 'network', 'partner', 'vendor'])
+        n['boxes'] = parse_num(raw.get('no of boxes', raw.get('num pieces', _auto_col(raw, ['box', 'piece', 'item', 'quantity', 'pkg']))))
+        n['origin'] = str(raw.get('origin city', raw.get('sender city', _auto_col(raw, ['origin', 'sender', 'from city', 'source'])))).strip().title()
+        n['dest'] = str(raw.get('destination city', raw.get('consignee city', _auto_col(raw, ['destination', 'consignee', 'to city'])))).strip().title()
+        wh = str(raw.get('client location/warehouse', raw.get('origin hub name', _auto_col(raw, ['warehouse', 'hub', 'location'])))).strip()
         n['warehouse'] = wh.title() if wh else 'Unassigned'
-        n['manifest'] = parse_dt(raw.get('manifest date', raw.get('created at', '')))
-        n['pickup'] = parse_dt(raw.get('pickup date', raw.get('last pickup completed time', '')))
-        n['promise'] = parse_dt(raw.get('promise date', raw.get('expected delivery date', raw.get('expected date', ''))))
-        n['delivered'] = parse_dt(raw.get('delivered date', raw.get('delivered time', '')))
-        status = str(raw.get('current status', raw.get('status', ''))).strip()
+        n['manifest'] = parse_dt(raw.get('manifest date', raw.get('created at',
+            _auto_col(raw, ['manifest', 'created', 'booking']))))
+        n['pickup'] = parse_dt(raw.get('pickup date', raw.get('last pickup completed time',
+            _auto_col(raw, ['pickup', 'dispatch', 'shipped']))))
+        n['promise'] = parse_dt(raw.get('promise date', raw.get('expected delivery date', raw.get('expected date',
+            _auto_col(raw, ['promise', 'expected', 'committed', 'scheduled'])))))
+        n['delivered'] = parse_dt(raw.get('delivered date', raw.get('delivered time',
+            _auto_col(raw, ['delivered', 'delivery date', 'completion']))))
+        status = str(raw.get('current status', raw.get('status',
+            _auto_col(raw, ['status', 'condition'])))).strip()
         n['status'] = status
         n['is_delivered'] = status.lower() in ('delivered', 'delivered to consignee') or n['delivered'] is not None
-        state = str(raw.get('state', '')).strip().title()
+        state = str(raw.get('state', _auto_col(raw, ['state', 'province']))).strip().title()
         n['state'] = state if state else guess_state(n['dest'])
-        n['amount'] = parse_num(raw.get('package amount', raw.get('declared value', '0')))
-        n['weight'] = parse_num(raw.get('weight', '0'))
-        n['attempts'] = int(parse_num(raw.get('attempt count', '0')))
-        n['last_scan'] = parse_dt(raw.get('last scan date', ''))
-        n['remarks'] = str(raw.get('remarks', raw.get('delivery failure reason', ''))).strip()
+        n['amount'] = parse_num(raw.get('package amount', raw.get('declared value',
+            _auto_col(raw, ['amount', 'value', 'declared', 'price']))))
+        n['weight'] = parse_num(raw.get('weight', _auto_col(raw, ['weight', 'wt', 'kg'])))
+        n['attempts'] = int(parse_num(raw.get('attempt count', _auto_col(raw, ['attempt', 'retry']))))
+        n['last_scan'] = parse_dt(raw.get('last scan date', _auto_col(raw, ['scan', 'last update'])))
+        n['remarks'] = str(raw.get('remarks', raw.get('delivery failure reason',
+            _auto_col(raw, ['remarks', 'reason', 'failure', 'comment'])))).strip()
         normalized.append(n)
 
     shipments = len(normalized)
@@ -309,7 +328,7 @@ def build_report(records):
         'insights': [
             f'{del_rate}% closure across {fmt_num(shipments)} shipments; {fmt_num(open_s)} remain open.',
             f'{on_rate}% on-time delivery; {fmt_num(late)} late delivered.',
-            f'{fmt_num(open_delay)} open past promise — require ETA updates.',
+            f'{fmt_num(open_delay)} open past promise - require ETA updates.',
             f'{top_s} is top destination state.', f'Top lane: {top_l}.',
         ], 'records': normalized,
     }
@@ -578,17 +597,23 @@ def generate_docx(report):
 
     add_heading('MIS DASHBOARD — SONIC BUSINESS SOLUTIONS', 0)
     p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r = p.add_run(report['client']); r.bold = True; r.font.size = DocPt(16); r.font.color.rgb = DocRGB(0x25,0x63,0xEB)
+    r = p.add_run(report['client']); r.bold = True; r.font.size = DocPt(18); r.font.color.rgb = DocRGB(0x25,0x63,0xEB)
     p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     r = p.add_run(report['period']); r.font.size = DocPt(10); r.font.color.rgb = DocRGB(0x64,0x74,0x8B)
     p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     r = p.add_run(report['generated']); r.font.size = DocPt(8); r.font.color.rgb = DocRGB(0x94,0xA3,0xB8)
     doc.add_paragraph().add_run().add_break()
 
+    doc.add_heading('Performance Summary', level=1)
+    kpi_data = [
+        f"Total Shipments: {fmt_num(report['shipments'])}  |  Delivered: {report['delivered_rate']}%  |  On-Time: {report['on_time_rate']}%  |  Open: {fmt_num(report['open'])}",
+        f"Package Value: {report['value_label']}  |  Total Boxes: {fmt_num(report['total_boxes'])}  |  Weight: {report['weight_label']}  |  Avg TAT: {report['avg_tat_label']}",
+        f"Attempted: {fmt_num(report['attempted'])}  |  Late Delivered: {fmt_num(report['late_delivered'])}  |  Open Delayed: {fmt_num(report['open_delayed'])}"
+    ]
+    for kd in kpi_data:
+        p = doc.add_paragraph(); r = p.add_run(kd); r.font.size = DocPt(10); r.font.color.rgb = DocRGB(0x1F,0x29,0x37)
+
     doc.add_heading('Executive Summary', level=1)
-    p = doc.add_paragraph()
-    r = p.add_run(f"Total Shipments: {fmt_num(report['shipments'])} | Delivered: {report['delivered_rate']}% | On-Time: {report['on_time_rate']}% | Open Delayed: {fmt_num(report['open_delayed'])}")
-    r.font.size = DocPt(10); r.font.color.rgb = DocRGB(0x33,0x33,0x33)
     for ins in report['insights']:
         p = doc.add_paragraph(style='List Bullet'); r = p.add_run(ins); r.font.size = DocPt(9); r.font.color.rgb = DocRGB(0x47,0x55,0x69)
 
@@ -616,8 +641,14 @@ def generate_docx(report):
     build_table('Open Aging', ['Aging', 'Count', 'Interpretation'],
                 [[lb, fmt_num(vl), 'Escalate' if lb=='9d+' else ('Watchlist' if lb=='6-8d' else 'Follow-up')]
                  for lb, vl in sorted(report['aging'].items())])
-    build_table('Top Lanes', ['Lane', 'Shipments', 'Delivered', 'Open', 'Rate'],
-                [[l[:50], fmt_num(c), '--', '--', '--'] for l, c in report['lane_entries'][:6]])
+    lane_data = []
+    for la, co in report['lane_entries'][:6]:
+        ld = sum(1 for r in report['records']
+                 if f"{r['origin']} -> {r['dest']}" == la and r['is_delivered'])
+        lo = co - ld
+        lr = round(ld / max(1, co) * 100)
+        lane_data.append([la[:50], fmt_num(co), fmt_num(ld), fmt_num(lo), f'{lr}%'])
+    build_table('Top Lanes', ['Lane', 'Shipments', 'Delivered', 'Open', 'Rate'], lane_data)
 
     now = datetime.now()
     exc = []
@@ -640,7 +671,7 @@ class LogisticsPDF(FPDF):
     def header(self):
         self.set_font('Helvetica', 'B', 8)
         self.set_text_color(0x1E, 0x3A, 0x5F)
-        self.cell(0, 6, 'SONIC BUSINESS SOLUTIONS — MIS DASHBOARD', align='C'); self.ln(8)
+        self.cell(0, 6, 'SONIC BUSINESS SOLUTIONS - MIS DASHBOARD', align='C'); self.ln(8)
         self.set_draw_color(0x25, 0x63, 0xEB); self.set_line_width(0.5)
         self.line(10, self.get_y(), 200, self.get_y()); self.ln(4)
     def footer(self):
@@ -712,8 +743,12 @@ def generate_pdf(report):
               [[lb, fmt_num(vl), 'Escalate' if lb=='9d+' else ('Watchlist' if lb=='6-8d' else 'Follow-up')]
                for lb, vl in sorted(report['aging'].items())]); pdf.ln(4)
     pdf.sub('Top Lanes')
-    pdf.table(['Lane', 'Shipments', 'Delivered', 'Open', 'Rate'],
-              [[l[:50], fmt_num(c), '--', '--', '--'] for l, c in report['lane_entries'][:6]]); pdf.ln(4)
+    pdf_lanes = []
+    for la, co in report['lane_entries'][:6]:
+        ld = sum(1 for r in report['records']
+                 if f"{r['origin']} -> {r['dest']}" == la and r['is_delivered'])
+        pdf_lanes.append([la[:50], fmt_num(co), fmt_num(ld), fmt_num(co-ld), f'{round(ld/max(1,co)*100)}%'])
+    pdf.table(['Lane', 'Shipments', 'Delivered', 'Open', 'Rate'], pdf_lanes); pdf.ln(4)
     now = datetime.now(); exc = []
     for r in report['priority_records'][:8]:
         d = not r['is_delivered'] and r['promise'] and r['promise'] < now

@@ -275,7 +275,9 @@ const CHART_DEFAULTS={responsive:true,maintainAspectRatio:false,plugins:{legend:
 
 const SCHEMAS={
   sonic_b2b:{detect:h=>h.includes('Order id'),fields:{id:'Order id',lrn:'LRN',boxes:'No of boxes',client:'Client',manifest:'Manifest Date',pickup:'Pickup Date',expected:'Expected Date',promise:'Promise Date',delivered:'Delivered Date',origin:'Origin City',destination:'Destination City',warehouse:'Client Location/warehouse',status:'Current Status',statusType:'Status Type',remarks:'Remarks',amount:'Package Amount',weight:'Weight',attempts:'Attempt Count',lastScan:'Last Scan Date',lastScanLocation:'Last Scan Location',zone:'Invoice Zone',state:'State'}},
-  customer_mis:{detect:h=>h.includes('Reference Number')&&h.includes('Customer Code'),fields:{id:'Reference Number',lrn:'Reference Number',boxes:'Num Pieces',client:'Customer Code',manifest:'Created at',pickup:'Last Pickup Completed Time',expected:'Expected Delivery Date',promise:'Expected Delivery Date',delivered:'Delivered Time',origin:'Sender City',destination:'Consignee City',warehouse:'Origin Hub Name',status:'Status',statusType:'Status',remarks:'Delivery Failure Reason',amount:'Declared Value',weight:'Weight',attempts:null,lastScan:null,lastScanLocation:'Destination Hub Name',zone:null,state:'Consignee City'}}
+  customer_mis:{detect:h=>h.includes('Reference Number')&&h.includes('Customer Code'),fields:{id:'Reference Number',lrn:'Reference Number',boxes:'Num Pieces',client:'Customer Code',manifest:'Created at',pickup:'Last Pickup Completed Time',expected:'Expected Delivery Date',promise:'Expected Delivery Date',delivered:'Delivered Time',origin:'Sender City',destination:'Consignee City',warehouse:'Origin Hub Name',status:'Status',statusType:'Status',remarks:'Delivery Failure Reason',amount:'Declared Value',weight:'Weight',attempts:null,lastScan:null,lastScanLocation:'Destination Hub Name',zone:null,state:'Consignee City'}},
+  mis_may:{detect:h=>h.includes('LR No'),fields:{id:'LR No',lrn:'LR No',boxes:null,client:'Network',manifest:'Last Pickup Completed Time',pickup:'Last Pickup Completed Time',expected:null,promise:null,delivered:null,origin:'Sender City',destination:'Consignee City',warehouse:'Client Location/warehouse',status:'Status',statusType:'Status',remarks:null,amount:'Declared Value',weight:'Weight',attempts:null,lastScan:null,lastScanLocation:null,zone:null,state:'Consignee City'}},
+  generic:{detect:null,autoDetect:true,fields:null}
 };
 const MERGED_INDEX=-2;
 const app={datasets:[],activeIndex:-1,records:[],filtered:[],source:'',uploadedFiles:[],asOf:new Date(),filters:{period:'all',warehouse:'all',state:'all',status:'all'}};
@@ -304,7 +306,36 @@ function bindEvents(){
   window.addEventListener('resize',debounce(()=>{if(app.filtered.length)renderCharts(buildAggregates(app.filtered))},200))
 }
 
-function detectSchema(header){for(const[k,p]of Object.entries(SCHEMAS))if(p.detect(header))return k;return header.some(h=>/order/i.test(h))?'sonic_b2b':'customer_mis'}
+function detectSchema(header){for(const[k,p]of Object.entries(SCHEMAS))if(p.detect&&p.detect(header))return k;return 'generic'}
+
+function autoDetectFields(header){
+  const lc=header.map(h=>h.toLowerCase().trim());
+  const find=(pats)=>{for(const p of pats){const i=lc.findIndex(c=>c.includes(p.toLowerCase()));if(i>=0)return header[i]}return null};
+  return{
+    id:find(['order id','reference number','lr no','lrn','tracking','awb','waybill','shipment id']),
+    lrn:find(['lrn','lr no','reference number','tracking','awb']),
+    boxes:find(['no of boxes','num pieces','pieces','items','quantity','pkg','packages','carton','box']),
+    client:find(['client','customer code','customer','network','partner','vendor','company']),
+    manifest:find(['manifest date','created at','booking date','order date']),
+    pickup:find(['pickup date','last pickup completed','dispatch','shipped']),
+    expected:find(['expected date','expected delivery','edt','eta','scheduled']),
+    promise:find(['promise date','expected delivery date','committed']),
+    delivered:find(['delivered date','delivered time','delivery date','completion']),
+    origin:find(['origin city','sender city','from city','source city','pickup city']),
+    destination:find(['destination city','consignee city','to city','dest city','delivery city']),
+    warehouse:find(['client location/warehouse','origin hub name','warehouse','hub name','location']),
+    status:find(['current status','status','condition']),
+    statusType:find(['status type']),
+    remarks:find(['remarks','delivery failure reason','failure reason','reason','comment']),
+    amount:find(['package amount','declared value','amount','value','invoice','price']),
+    weight:find(['weight','wt','kg']),
+    attempts:find(['attempt count','attempt','retry']),
+    lastScan:find(['last scan date','scan date','last update']),
+    lastScanLocation:find(['last scan location','destination hub name','scan location']),
+    zone:find(['invoice zone','zone','region']),
+    state:find(['state','province']),
+  }
+}
 
 function readFiles(files){
   const csv=files.filter(f=>f.name.endsWith('.csv')||f.type==='text/csv');
@@ -320,7 +351,8 @@ function readFiles(files){
 
 function loadCsv(text,source){
   const rows=parseCsv(text);if(!rows.length)return null;
-  const header=Object.keys(rows[0]),schema=detectSchema(header),fields=SCHEMAS[schema].fields;
+  const header=Object.keys(rows[0]),schema=detectSchema(header);
+  const sc=SCHEMAS[schema],fields=sc.autoDetect?autoDetectFields(header):sc.fields;
   const records=rows.map((r,i)=>normalizeRow(r,i,fields,schema)).filter(r=>r.id);
   if(!records.length){showToast(`No data in ${source}.`);return null}
   const client=extractClient(records,source,schema);
@@ -328,7 +360,7 @@ function loadCsv(text,source){
 }
 
 function extractClient(records,source,schema){
-  if(schema==='customer_mis'){const c=new Set(records.map(r=>r.client).filter(Boolean));if(c.size===1)return `${[...c][0]} (MIS)`}
+  if(schema==='customer_mis'||schema==='mis_may'||schema==='generic'){const c=new Set(records.map(r=>r.client).filter(Boolean));if(c.size===1)return `${[...c][0]} (MIS)`}
   const c=new Set(records.filter(r=>r.client&&r.client!=='Customer').map(r=>r.client));
   if(c.size===1)return[...c][0];return source.replace(/\.csv$/i,'').replace(/[_-]/g,' ').replace(/\b\w/g,c=>c.toUpperCase())
 }
@@ -337,7 +369,7 @@ function normalizeRow(row,index,fields,schema){
   const g=k=>{const c=fields[k];return c?cleanCell(row[c]!==undefined?row[c]:''):''};
   const st=g('status'),stt=g('statusType'),dd=parseDate(g('delivered'));
   let o=g('origin'),d=g('destination'),s=g('state'),z=g('zone');
-  if(schema==='customer_mis'){s=guessState(d);z=''}
+  if(schema==='customer_mis'||schema==='mis_may'||schema==='generic'){s=guessState(d);z=''}
   return{row,index,id:g('id')||g('lrn')||`Row ${index+1}`,lrn:g('lrn'),client:titleCase(g('client'))||'Customer',
     boxes:parseNum(g('boxes')),warehouse:titleCase(g('warehouse'))||'Unassigned',
     manifestDate:parseDate(g('manifest')),pickupDate:parseDate(g('pickup')),expectedDate:parseDate(g('expected')),
@@ -521,8 +553,10 @@ async function generatePptx(){
   const datasets=app.datasets.map(ds=>{const r=buildSummary(ds.records);const a=buildAggregates(ds.records);return{...ds,summary:r,agg:a}});
   if(app.datasets.length>=2){const m=getMergedRecords();datasets.push({source:'merged',client:'All Customers (Consolidated)',records:m,summary:buildSummary(m),agg:buildAggregates(m)})}
 
-  const NAVY='1E3A5F',BLUE='2563EB',WHITE='FFFFFF',DARK='0F172A',GRAY='64748B',LGRAY='94A3B8',BORDER='CBD5E1';
+  const NAVY='1E3A5F',BLUE='2563EB',WHITE='FFFFFF',DARK='0F172A',GRAY='64748B',LGRAY='94A3B8',BORDER='CBD5E1',BG='F8FAFC';
   const ACCENT=['EBF5FF','D1FAE5','FEF3C7','FEE2E2'];
+  const ACCENT_BORDER=['93C5FD','6EE7B7','FCD34D','FCA5A5'];
+  const KPI_COLORS=['2563EB','059669','D97706','DC2626'];
 
   for(let i=0;i<datasets.length;i++){
     try{
@@ -533,56 +567,104 @@ async function generatePptx(){
     pptx.author='Sonic Business Solutions';pptx.subject='MIS Dashboard Report';
 
     const genDate=new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
-    const footer=sl=>{sl.addShape('line',{x:0.5,y:6.82,w:'90%',h:0,line:{color:BORDER,width:0.5}});sl.addText(`Generated ${genDate}`,{x:0.5,y:6.85,w:8,h:0.2,fontSize:7,fontFace:'Arial',color:LGRAY});sl.addText(ds.client,{x:9,y:6.85,w:4,h:0.2,fontSize:7,fontFace:'Arial',color:NAVY,bold:true,align:'right'})};
-    const kpiRow=(sl,kpis,y)=>{
-      kpis.forEach((k,i)=>{const x=0.5+i*3.1;
-        sl.addShape('roundRect',{x,y,w:2.9,h:0.85,fill:{color:ACCENT[i%4]},rectRadius:0.08});
-        sl.addText(k[1],{x:x+0.1,y:y+0.05,w:2.7,h:0.3,fontSize:16,fontFace:'Arial',color:DARK,bold:true});
-        sl.addText(k[0],{x:x+0.1,y:y+0.4,w:2.7,h:0.18,fontSize:7.5,fontFace:'Arial',color:'475569',bold:true});
-        sl.addText(k[2],{x:x+0.1,y:y+0.6,w:2.7,h:0.17,fontSize:7,fontFace:'Arial',color:GRAY})})
-    };
+    const footer=sl=>{sl.addShape('line',{x:0.5,y:6.85,w:'90%',h:0,line:{color:BORDER,width:0.5}});sl.addText(`Generated ${genDate} — Sonic Business Solutions`,{x:0.5,y:6.88,w:6,h:0.22,fontSize:7,fontFace:'Arial',color:LGRAY});sl.addText(ds.client,{x:9,y:6.88,w:4,h:0.22,fontSize:7,fontFace:'Arial',color:NAVY,bold:true,align:'right'})};
+    const sectionHeader=(sl,x,y,w,title,color)=>{sl.addShape('roundRect',{x,y,w:0.06,h:0.32,fill:{color:color||BLUE}});sl.addText(title,{x:x+0.18,y,w:w,h:0.3,fontSize:13,fontFace:'Arial',color:DARK,bold:true})};
+    const kpiCard=(sl,x,y,w,k)=>{sl.addShape('roundRect',{x,y,w:w,h:0.92,fill:{color:BG},line:{color:BORDER,width:0.5},rectRadius:0.08});sl.addShape('roundRect',{x,y,w:0.06,h:0.92,fill:{color:KPI_COLORS[k.i]},rectRadius:0.06});sl.addText(k.val,{x:x+0.15,y:y+0.08,w:w-0.2,h:0.28,fontSize:17,fontFace:'Arial',color:DARK,bold:true});sl.addText(k.label,{x:x+0.15,y:y+0.42,w:w-0.2,h:0.18,fontSize:7.5,fontFace:'Arial',color:'475569',bold:true});sl.addText(k.sub,{x:x+0.15,y:y+0.62,w:w-0.2,h:0.18,fontSize:7,fontFace:'Arial',color:GRAY})};
+    const makeTbl=(rows,colW,opts)=>{return{rows:rows.map((r,ri)=>ri===0?r.map(c=>({text:c,options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:8}})):r.map(c=>({text:c,options:{fontSize:8,fill:ri%2===0?{color:BG}:undefined}}))),options:{fontSize:8,fontFace:'Arial',border:{color:BORDER,pt:0.5},colW:colW||[],rowH:0.32,...opts}}};
+    const barShape=(sl,x,y,w,h,val,max,color)=>{const p=Math.min(1,Math.max(0,max?val/max:0));if(p>0.02)sl.addShape('roundRect',{x,y,w:w*p,h:h,fill:{color:color},rectRadius:0.04})};
 
     // ── Slide 1: Cover ──
     let sl=pptx.addSlide();
     sl.addText('SONIC BUSINESS SOLUTIONS',{x:0,y:0,w:'100%',h:0.45,fontSize:10,fontFace:'Arial',color:WHITE,bold:true,fill:{color:NAVY},align:'center',valign:'middle'});
-    sl.addShape('line',{x:0.5,y:0.7,w:'90%',h:0,line:{color:BLUE,width:2}});
-    sl.addText('MIS Dashboard',{x:0.5,y:0.95,w:8,h:0.5,fontSize:28,fontFace:'Arial',color:DARK,bold:true});
-    sl.addText(ds.client,{x:0.52,y:1.5,w:7,h:0.3,fontSize:16,fontFace:'Arial',color:NAVY,bold:true});
-    kpiRow(sl,[['Total Shipments',nf.format(s.shipments),'All consignments'],['Delivered',`${s.deliveredRate}%`,`${nf.format(s.delivered)} closed`],['On-Time Rate',`${s.onTimeRate}%`,`${nf.format(s.lateDelivered)} late`],['Open Delayed',nf.format(s.delayedOpen),`${nf.format(s.open)} open`]],2.3);
-    // Insights
-    const inss=[`${s.deliveredRate}% closure across ${nf.format(s.shipments)} shipments; ${nf.format(s.open)} remain open.`,`${s.onTimeRate}% on-time delivery; ${nf.format(s.lateDelivered)} late delivered.`,`${nf.format(s.delayedOpen)} open past promise — require ETA updates.`,a.states.length?`${a.states[0].label} is top destination state.`:'',a.lanes.length?`Top lane: ${a.lanes[0].label}.`:''].filter(Boolean);
-    sl.addShape('roundRect',{x:0.5,y:3.65,w:'90%',h:1.8,fill:{color:'F8FAFC'},line:{color:'E2E8F0',width:0.5},rectRadius:0.1});
-    sl.addShape('roundRect',{x:0.5,y:3.65,w:0.05,h:1.8,fill:{color:BLUE}});
-    sl.addText('Executive Summary',{x:0.75,y:3.75,w:4,h:0.22,fontSize:9.5,fontFace:'Arial',color:DARK,bold:true});
-    inss.forEach((ins,j)=>{sl.addText(`• ${ins}`,{x:0.75,y:4.05+j*0.22,w:11,h:0.22,fontSize:8,fontFace:'Arial',color:'334155'})});
-    // Status table on cover
+    sl.addShape('rect',{x:0,y:0.45,w:'100%',h:0.04,fill:{color:BLUE}});
+    sl.addText('MIS Dashboard',{x:0.5,y:0.75,w:8,h:0.45,fontSize:30,fontFace:'Arial',color:DARK,bold:true});
+    sl.addText(ds.client,{x:0.52,y:1.25,w:7,h:0.28,fontSize:15,fontFace:'Arial',color:NAVY,bold:true});
+    sl.addShape('line',{x:0.5,y:1.6,w:3.5,h:0,line:{color:BLUE,width:1.5}});
+
+    // KPI cards row 1
+    [{label:'Total Shipments',val:nf.format(s.shipments),sub:'All consignments',i:0},{label:'Delivered',val:`${s.deliveredRate}%`,sub:`${nf.format(s.delivered)} closed`,i:1},{label:'On-Time Rate',val:`${s.onTimeRate}%`,sub:`${nf.format(s.lateDelivered)} late delivered`,i:2},{label:'Open Delayed',val:nf.format(s.delayedOpen),sub:`${nf.format(s.open)} remain open`,i:3}].forEach((k,j)=>kpiCard(sl,0.5+j*3.1,1.95,2.9,k));
+
+    // Executive Summary
+    const inss=[`${s.deliveredRate}% closure across ${nf.format(s.shipments)} shipments; ${nf.format(s.open)} remain open.`,`${s.onTimeRate}% on-time delivery; ${nf.format(s.lateDelivered)} late delivered consignments.`,`${nf.format(s.delayedOpen)} open shipments past promise date — require immediate ETA updates.`,a.states.length?`${a.states[0].label} is the top destination state across all lanes.`:'',a.lanes.length?`Top lane: ${a.lanes[0].label}.`:''].filter(Boolean);
+    sl.addShape('roundRect',{x:0.5,y:3.2,w:'90%',h:1.85,fill:{color:BG},line:{color:BORDER,width:0.5},rectRadius:0.1});
+    sectionHeader(sl,0.6,3.3,5,'Executive Summary');
+    inss.forEach((ins,j)=>{sl.addText(`• ${ins}`,{x:0.85,y:3.72+j*0.23,w:11.5,h:0.23,fontSize:8.5,fontFace:'Arial',color:'334155'})});
+
+    // Status Breakdown Table
+    sl.addText('Status Breakdown',{x:0.55,y:5.2,w:4,h:0.2,fontSize:10,fontFace:'Arial',color:NAVY,bold:true});
     const sr=[['Status','Count','Share']];
     a.status.forEach(e=>sr.push([e.label,nf.format(e.value),`${Math.round(e.value/s.shipments*100)}%`]));
-    const stTbl=[{rows:sr,options:{x:0.55,y:5.6,w:5.5,fontSize:7,fontFace:'Arial',border:{color:BORDER,pt:0.5},colW:[2,1.2,1.5],rowH:0.28}}];
-    stTbl.forEach(t=>sl.addTable(t.rows.map((r,i)=>i===0?r.map(c=>({text:c,options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7}})):r),t.options));
+    const stTbl=makeTbl(sr,[2.2,1.3,1.5],{x:0.55,y:5.45,w:5.5,rowH:0.28});
+    sl.addTable(stTbl.rows,stTbl.options);
+
+    // Top Destinations
+    sl.addText('Top Destinations',{x:7,y:5.2,w:4,h:0.2,fontSize:10,fontFace:'Arial',color:NAVY,bold:true});
+    const maxSt=a.states.length?a.states[0].value:1;
+    a.states.slice(0,6).forEach((e,j)=>{sl.addText(e.label,{x:7,y:5.48+j*0.28,w:2,h:0.22,fontSize:8,fontFace:'Arial',color:DARK});barShape(sl,9.2,5.5+j*0.28,3.3,0.15,e.value,maxSt,BLUE);sl.addText(nf.format(e.value),{x:11.2,y:5.48+j*0.28,w:1.5,h:0.22,fontSize:8,fontFace:'Arial',color:GRAY,align:'right'})});
     footer(sl);
 
     // ── Slide 2: Performance ──
     sl=pptx.addSlide();
-    sl.addText('Performance Overview',{x:0.5,y:0.15,w:8,h:0.35,fontSize:20,fontFace:'Arial',color:DARK,bold:true});
-    sl.addShape('line',{x:0.5,y:0.55,w:'90%',h:0,line:{color:'E2E8F0',width:0.5}});
-    kpiRow(sl,[['Package Value',s.valueLabel,'Declared value'],['Total Boxes',nf.format(s.boxes),s.weightLabel],['Avg TAT',s.avgTatLabel,'Pickup to delivery'],['Attempted',nf.format(s.attempted),'Total attempts']],0.75);
-    // Aging table
-    sl.addText('Open Shipment Aging',{x:0.5,y:1.9,w:5,h:0.25,fontSize:11,fontFace:'Arial',color:NAVY,bold:true});
-    const ar=[['Aging','Count','Action']];
-    a.aging.forEach(e=>ar.push([e.label,nf.format(e.value),e.label.includes('9')?'Escalate':'Follow-up']));
-    sl.addTable(ar.map((r,i)=>i===0?r.map(c=>({text:c,options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:8}})):r.map(c=>({text:c,options:{fontSize:8}}))),{x:0.5,y:2.15,w:6,fontSize:8,fontFace:'Arial',border:{color:BORDER,pt:0.5},colW:[1.8,1.2,2],rowH:0.32});
-    // Top lanes table
-    sl.addText('Top Lanes',{x:7,y:1.9,w:5,h:0.25,fontSize:11,fontFace:'Arial',color:NAVY,bold:true});
+    sl.addText('Performance Overview',{x:0.5,y:0.15,w:10,h:0.38,fontSize:22,fontFace:'Arial',color:DARK,bold:true});
+    sl.addShape('line',{x:0.5,y:0.58,w:'90%',h:0,line:{color:BORDER,width:0.5}});
+
+    [{label:'Package Value',val:s.valueLabel,sub:'Declared value',i:0},{label:'Total Boxes',val:nf.format(s.boxes),sub:s.weightLabel,i:1},{label:'Avg TAT',val:s.avgTatLabel,sub:'Pickup to delivery',i:2},{label:'Attempted',val:nf.format(s.attempted),sub:'Delivery attempts',i:3}].forEach((k,j)=>kpiCard(sl,0.5+j*3.1,0.8,2.9,k));
+
+    // Open Shipment Aging
+    sectionHeader(sl,0.5,2.05,5,'Open Shipment Aging',BLUE);
+    const maxAg=Math.max(1,...a.aging.map(e=>e.value));
+    a.aging.forEach((e,j)=>{sl.addText(e.label,{x:0.7,y:2.45+j*0.42,w:1.2,h:0.2,fontSize:8.5,fontFace:'Arial',color:DARK,bold:true});barShape(sl,2,2.5+j*0.42,5,0.2,e.value,maxAg,['059669','D97706','F97316','DC2626'][j]);sl.addText(nf.format(e.value),{x:7.2,y:2.45+j*0.42,w:0.8,h:0.2,fontSize:8.5,fontFace:'Arial',color:GRAY});sl.addText(j===3?'Immediate Escalation':'Monitor & Follow-up',{x:8.1,y:2.45+j*0.42,w:2.5,h:0.2,fontSize:7.5,fontFace:'Arial',color:j===3?'DC2626':'475569'})});
+
+    // Top Lanes Table
+    sectionHeader(sl,0.5,4.25,5,'Top Lanes',BLUE);
     const lr=[['Lane','Shipments']];
-    a.lanes.slice(0,8).forEach(l=>lr.push([l.label.length>35?l.label.slice(0,35)+'...':l.label,nf.format(l.value)]));
-    sl.addTable(lr.map((r,i)=>i===0?r.map(c=>({text:c,options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:8}})):r.map(c=>({text:c,options:{fontSize:8}}))),{x:7,y:2.15,w:6,fontSize:8,fontFace:'Arial',border:{color:BORDER,pt:0.5},colW:[3.5,1.2],rowH:0.32});
-    // Priority exceptions
-    sl.addText('Priority Exceptions',{x:0.5,y:4.9,w:5,h:0.25,fontSize:11,fontFace:'Arial',color:'991B1B',bold:true});
+    a.lanes.slice(0,8).forEach(l=>lr.push([l.label.length>40?l.label.slice(0,40)+'...':l.label,nf.format(l.value)]));
+    const lrTbl=makeTbl(lr,[4,1.2],{x:0.55,y:4.65,w:6,rowH:0.28});
+    sl.addTable(lrTbl.rows,lrTbl.options);
+
+    // Priority Exceptions
+    sl.addShape('roundRect',{x:7.2,y:4.25,w:5.6,h:2.4,fill:{color:'FFF7ED'},line:{color:'FED7AA',width:0.5},rectRadius:0.1});
+    sl.addText('Priority Exceptions',{x:7.4,y:4.35,w:5,h:0.2,fontSize:11,fontFace:'Arial',color:'991B1B',bold:true});
     const now=new Date();
-    const er=[['Order','Destination','Status','Promise','Amount']];
-    priorityRecords(ds.records).slice(0,6).forEach(r=>{const d=!r.isDelivered&&r.promiseDate&&r.promiseDate<now;er.push([r.id.slice(0,22),`${r.destination}, ${r.state}`.slice(0,26),d?'Delayed':(r.isDelivered?'Delivered':'Open'),formatDate(r.promiseDate),fmtMoney(r.amount)])});
-    sl.addTable(er.map((r,i)=>i===0?r.map(c=>({text:c,options:{fill:{color:'991B1B'},color:WHITE,bold:true,fontSize:7}})):r.map(c=>({text:c,options:{fontSize:7}}))),{x:0.5,y:5.2,w:'90%',fontSize:7,fontFace:'Arial',border:{color:BORDER,pt:0.5},colW:[2.2,2.5,1.3,1.5,2],rowH:0.28});
+    const er=[['Order','Destination','Status','Promise']];
+    priorityRecords(ds.records).slice(0,6).forEach(r=>{const d=!r.isDelivered&&r.promiseDate&&r.promiseDate<now;er.push([r.id.slice(0,20),`${r.destination}, ${r.state}`.slice(0,24),d?'Delayed':r.isDelivered?'Delivered':'Open',r.promiseDate?formatDate(r.promiseDate):'-'])});
+    const erTbl=makeTbl(er,[2.2,2.2,1.2,1.3],{x:7.35,y:4.65,w:5.3,rowH:0.26,fontSize:7});
+    sl.addTable(erTbl.rows,erTbl.options);
+    footer(sl);
+
+    // ── Slide 3: Delivery Analysis ──
+    sl=pptx.addSlide();
+    sl.addText('Delivery Analysis',{x:0.5,y:0.15,w:10,h:0.38,fontSize:22,fontFace:'Arial',color:DARK,bold:true});
+    sl.addShape('line',{x:0.5,y:0.58,w:'90%',h:0,line:{color:BORDER,width:0.5}});
+
+    const dwp=s.shipments===0?0:Math.round((s.deliveredRate+s.onTimeRate)/2);
+    [{label:'Delivery Rate',val:`${s.deliveredRate}%`,sub:`${nf.format(s.delivered)} of ${nf.format(s.shipments)}`,i:1},{label:'On-Time Rate',val:`${s.onTimeRate}%`,sub:`${nf.format(s.lateDelivered)} late delivered`,i:1},{label:'Avg TAT',val:s.avgTatLabel,sub:'Manifest to delivery',i:2},{label:'Open Count',val:nf.format(s.open),sub:`${nf.format(s.delayedOpen)} past promise`,i:3}].forEach((k,j)=>kpiCard(sl,0.5+j*3.1,0.8,2.9,k));
+
+    // State distribution with visual bars
+    sectionHeader(sl,0.5,2.05,5,'Delivery by State',BLUE);
+    const stBars=a.states.slice(0,8);
+    const maxStBar=stBars.length?stBars[0].value:1;
+    stBars.forEach((e,j)=>{const y=2.45+j*0.42;sl.addText(e.label,{x:0.7,y,w:1.8,h:0.2,fontSize:8.5,fontFace:'Arial',color:DARK});barShape(sl,2.6,y+0.03,5,0.16,e.value,maxStBar,['2563EB','059669','D97706','7C3AED','DC2626','0F766E','D97706','64748B'][j%8]);sl.addText(nf.format(e.value),{x:7.8,y,w:1,h:0.2,fontSize:8.5,fontFace:'Arial',color:GRAY});sl.addText(`${Math.round(e.value/s.shipments*100)}%`,{x:8.8,y,w:1,h:0.2,fontSize:8,fontFace:'Arial',color:LGRAY})});
+
+    // Lane Volume Table
+    sectionHeader(sl,0.5,4.4,5,'Lane Volume Analysis',BLUE);
+    const llr=[['Lane','Shipments','Share']];
+    a.lanes.slice(0,8).forEach(l=>llr.push([l.label.length>40?l.label.slice(0,40)+'...':l.label,nf.format(l.value),`${Math.round(l.value/s.shipments*100)}%`]));
+    const llrTbl=makeTbl(llr,[3.5,1,1],{x:0.55,y:4.8,w:6,rowH:0.28});
+    sl.addTable(llrTbl.rows,llrTbl.options);
+
+    // Delivery Stats Summary
+    sl.addShape('roundRect',{x:7.2,y:4.4,w:5.6,h:2.3,fill:{color:BG},line:{color:BORDER,width:0.5},rectRadius:0.1});
+    sl.addText('Delivery Health Summary',{x:7.4,y:4.5,w:5,h:0.2,fontSize:11,fontFace:'Arial',color:NAVY,bold:true});
+    const healthItems=[
+      `• Delivery performance: ${s.deliveredRate}% — ${s.deliveredRate>=85?'Meeting target':'Needs attention'}`,
+      `• On-time delivery: ${s.onTimeRate}% — ${s.onTimeRate>=80?'Good SLA adherence':'Below SLA target'}`,
+      `• Average turnaround: ${s.avgTatLabel}`,
+      `• Total package value: ${s.valueLabel}`,
+      `• Shipments requiring attention: ${nf.format(s.delayedOpen)}`,
+      `• Weight handled: ${s.weightLabel}`
+    ];
+    healthItems.forEach((h,j)=>{sl.addText(h,{x:7.5,y:4.82+j*0.26,w:5.2,h:0.26,fontSize:7.5,fontFace:'Arial',color:'334155'})});
     footer(sl);
 
     const fileName=`${safeFile(ds.client)}_MIS_Report.pptx`;
@@ -601,60 +683,75 @@ async function generatePdfReports(){
 
   for(let i=0;i<datasets.length;i++){
     setProgress(15+i*(60/datasets.length),`Generating ${datasets[i].client}...`);
-    const ds=datasets[i],s=ds.summary;
+    const ds=datasets[i],s=ds.summary,a=ds.agg;
     const {jsPDF}=window.jspdf;
     const pdf=new jsPDF('p','mm','a4');
-    const W=210,M=12,pw=W-M*2;
+    const W=210,M=14,pw=W-M*2;
 
-    // Header
-    pdf.setFillColor(30,58,95);pdf.rect(0,0,W,8,'F');
-    pdf.setFontSize(8);pdf.setTextColor(255,255,255);pdf.text('SONIC BUSINESS SOLUTIONS — MIS DASHBOARD',W/2,5.5,{align:'center'});
-    pdf.setFontSize(20);pdf.setTextColor(30,58,95);pdf.text('MIS Dashboard',M,22);
-    pdf.setFontSize(12);pdf.setTextColor(37,99,235);pdf.text(ds.client,M,29);
-    pdf.setFontSize(8);pdf.setTextColor(100,116,139);pdf.text(s.period||'Selected Period',M,34);
-    pdf.setDrawColor(37,99,235);pdf.setLineWidth(0.5);pdf.line(M,36,M+pw,36);
+    // ── Header Bar ──
+    pdf.setFillColor(30,58,95);pdf.rect(0,0,W,9,'F');
+    pdf.setFillColor(37,99,235);pdf.rect(0,9,W,0.5,'F');
+    pdf.setFontSize(8.5);pdf.setTextColor(255,255,255);pdf.text('SONIC BUSINESS SOLUTIONS — MIS DASHBOARD',W/2,5.8,{align:'center'});
 
-    // KPIs
-    const kpis=[['Shipments',nf.format(s.shipments),'All consignments'],['Delivered',`${s.deliveredRate}%`,`${nf.format(s.delivered)} closed`],['On-Time',`${s.onTimeRate}%`,`${nf.format(s.lateDelivered)} late`],['Open Delayed',nf.format(s.delayedOpen),`${nf.format(s.open)} open`]];
-    const colors=[[235,245,255,147,197,253],[209,250,229,110,231,183],[254,243,199,252,211,77],[254,226,226,252,165,165]];
+    // ── Title ──
+    pdf.setFontSize(22);pdf.setTextColor(30,58,95);pdf.text('MIS Dashboard',M,20);
+    pdf.setFontSize(13);pdf.setTextColor(37,99,235);pdf.text(ds.client,M,27);
+    pdf.setFontSize(8);pdf.setTextColor(100,116,139);pdf.text(s.period||'Selected Period',M,32);
+    pdf.setDrawColor(37,99,235);pdf.setLineWidth(0.6);pdf.line(M,34,M+pw,34);
+
+    // ── KPI Cards ──
+    const kpis=[['Shipments',nf.format(s.shipments),'All consignments'],['Delivered',`${s.deliveredRate}%`,`${nf.format(s.delivered)} closed`],['On-Time',`${s.onTimeRate}%`,`${nf.format(s.lateDelivered)} late`],['Open',nf.format(s.delayedOpen),`${nf.format(s.open)} pending`]];
+    const kBg=[[235,245,255,147,197,253],[209,250,229,110,231,183],[254,243,199,252,211,77],[254,226,226,252,165,165]];
     kpis.forEach((k,idx)=>{
       const x=M+idx*(pw/4),w=pw/4-3;
-      pdf.setFillColor(colors[idx][0],colors[idx][1],colors[idx][2]);pdf.rect(x,40,w,16,'F');
-      pdf.setDrawColor(colors[idx][3],colors[idx][4],colors[idx][5]);pdf.rect(x,40,w,16,'S');
-      pdf.setFontSize(14);pdf.setTextColor(15,23,42);pdf.text(k[1],x+2,47);
-      pdf.setFontSize(6.5);pdf.setTextColor(71,85,105);pdf.text(k[0],x+2,51.5);
-      pdf.setFontSize(6);pdf.setTextColor(100,116,139);pdf.text(k[2],x+2,54.5);
+      pdf.setFillColor(kBg[idx][0],kBg[idx][1],kBg[idx][2]);pdf.rect(x,39,w,16,'F');
+      pdf.setDrawColor(kBg[idx][3],kBg[idx][4],kBg[idx][5]);pdf.setLineWidth(0.3);pdf.rect(x,39,w,16,'S');
+      pdf.setFontSize(15);pdf.setTextColor(15,23,42);pdf.text(k[1],x+2.5,47);
+      pdf.setFontSize(6.5);pdf.setTextColor(71,85,105);pdf.text(k[0],x+2.5,51.5);
+      pdf.setFontSize(6);pdf.setTextColor(100,116,139);pdf.text(k[2],x+2.5,54);
     });
 
-    let y=62;
-    // Insights
-    pdf.setFillColor(248,250,252);pdf.rect(M,y,pw,18,'F');pdf.setDrawColor(226,232,240);pdf.rect(M,y,pw,18,'S');
-    pdf.setFillColor(37,99,235);pdf.rect(M,y,1.5,18,'F');
-    pdf.setFontSize(9);pdf.setTextColor(15,23,42);pdf.text('Executive Summary',M+4,y+4);
-    const insights=[`${s.deliveredRate}% closure; ${nf.format(s.open)} open.`,`${s.onTimeRate}% on-time delivery.`,`${nf.format(s.delayedOpen)} past promise.`];
-    insights.forEach((ins,idx)=>{pdf.setFontSize(7.5);pdf.setTextColor(71,85,105);pdf.text(`• ${ins}`,M+4,y+8+idx*3.5)});
-    y+=22;
+    let y=61;
 
-    // Status table
-    pdf.setFontSize(10);pdf.setTextColor(30,58,95);pdf.text('Status Breakdown',M,y);y+=4;
-    const stRows=ds.agg.status.map(e=>[e.label,nf.format(e.value),`${Math.round(e.value/s.shipments*100)}%`]);
-    pdf.autoTable({startY:y,head:[['Status','Count','Share']],body:stRows,margin:{left:M,right:M},styles:{fontSize:8,cellPadding:2},headStyles:{fillColor:[30,58,95],textColor:255},alternateRowStyles:{fillColor:[248,250,252]}});
-    y=pdf.lastAutoTable.finalY+8;
+    // ── Executive Summary ──
+    pdf.setFillColor(248,250,252);pdf.rect(M,y,pw,22,'F');
+    pdf.setDrawColor(226,232,240);pdf.setLineWidth(0.2);pdf.rect(M,y,pw,22,'D');
+    pdf.setFillColor(37,99,235);pdf.rect(M,y,2,22,'F');
+    pdf.setFontSize(10);pdf.setTextColor(15,23,42);pdf.text('Executive Summary',M+4,y+5);
+    const insights=[`${s.deliveredRate}% closure across ${nf.format(s.shipments)} shipments — ${nf.format(s.open)} remain open.`,`${s.onTimeRate}% on-time delivery rate — ${nf.format(s.lateDelivered)} late delivered.`,`${nf.format(s.delayedOpen)} shipments past promise date — require immediate ETA updates.`,a.states.length?`${a.states[0].label} is the top destination state.`:'',a.lanes.length?`Top lane: ${a.lanes[0].label}.`:''].filter(Boolean);
+    insights.forEach((ins,idx)=>{pdf.setFontSize(7.5);pdf.setTextColor(71,85,105);pdf.text(`\u2022 ${ins}`,M+4,y+9.5+idx*3.2)});
+    y+=26;
 
-    // Aging table
-    pdf.setFontSize(10);pdf.setTextColor(30,58,95);pdf.text('Open Aging',M,y);y+=4;
-    const agRows=ds.agg.aging.map(e=>[e.label,nf.format(e.value),e.label.includes('9')?'Escalate':'Follow-up']);
-    pdf.autoTable({startY:y,head:[['Aging','Count','Action']],body:agRows,margin:{left:M,right:M},styles:{fontSize:8,cellPadding:2},headStyles:{fillColor:[30,58,95],textColor:255},alternateRowStyles:{fillColor:[248,250,252]}});
-    y=pdf.lastAutoTable.finalY+8;
+    // ── Status Breakdown ──
+    pdf.setFontSize(11);pdf.setTextColor(30,58,95);pdf.text('Status Breakdown',M,y);y+=5;
+    const stRows=a.status.map(e=>[e.label,nf.format(e.value),`${Math.round(e.value/s.shipments*100)}%`]);
+    pdf.autoTable({startY:y,head:[['Status','Count','Share']],body:stRows,margin:{left:M,right:M},styles:{fontSize:8.5,cellPadding:3,lineColor:[203,213,225],lineWidth:0.15},headStyles:{fillColor:[30,58,95],textColor:255,fontSize:8.5,fontStyle:'bold'},alternateRowStyles:{fillColor:[248,250,252]},columnStyles:{0:{cellWidth:'auto'},1:{halign:'right'},2:{halign:'right'}}});
+    y=pdf.lastAutoTable.finalY+7;
 
-    // Lanes
-    if(ds.agg.lanes.length&&y<250){
-      pdf.setFontSize(10);pdf.setTextColor(30,58,95);pdf.text('Top Lanes',M,y);y+=4;
-      const lnRows=ds.agg.lanes.slice(0,6).map(l=>[l.label.length>50?l.label.slice(0,50)+'...':l.label,nf.format(l.value)]);
-      pdf.autoTable({startY:y,head:[['Lane','Shipments']],body:lnRows,margin:{left:M,right:M},styles:{fontSize:8,cellPadding:2},headStyles:{fillColor:[30,58,95],textColor:255},alternateRowStyles:{fillColor:[248,250,252]}});
+    // ── Open Shipment Aging ──
+    pdf.setFontSize(11);pdf.setTextColor(30,58,95);pdf.text('Open Shipment Aging',M,y);y+=5;
+    const agRows=a.aging.map((e,j)=>[e.label,nf.format(e.value),['Monitor','Follow-up','Follow-up','Immediate Escalation'][j]]);
+    pdf.autoTable({startY:y,head:[['Aging Bucket','Count','Action']],body:agRows,margin:{left:M,right:M},styles:{fontSize:8.5,cellPadding:3,lineColor:[203,213,225],lineWidth:0.15},headStyles:{fillColor:[30,58,95],textColor:255,fontSize:8.5,fontStyle:'bold'},alternateRowStyles:{fillColor:[248,250,252]},columnStyles:{0:{cellWidth:'auto'},1:{halign:'right'},2:{fontStyle:'normal'}}});
+    y=pdf.lastAutoTable.finalY+7;
+
+    // ── Top Destinations ──
+    if(a.states.length){
+      pdf.setFontSize(11);pdf.setTextColor(30,58,95);pdf.text('Top Destinations',M,y);y+=5;
+      const stData=a.states.slice(0,8).map(e=>[e.label,nf.format(e.value),`${Math.round(e.value/s.shipments*100)}%`]);
+      pdf.autoTable({startY:y,head:[['State','Shipments','Share']],body:stData,margin:{left:M,right:M},styles:{fontSize:8.5,cellPadding:3,lineColor:[203,213,225],lineWidth:0.15},headStyles:{fillColor:[30,58,95],textColor:255,fontSize:8.5,fontStyle:'bold'},alternateRowStyles:{fillColor:[248,250,252]},columnStyles:{0:{cellWidth:'auto'},1:{halign:'right'},2:{halign:'right'}}});
+      y=pdf.lastAutoTable.finalY+7;
     }
 
-    pdf.setFontSize(7);pdf.setTextColor(148,163,184);pdf.text(`Generated ${new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})} — Sonic Business Solutions`,M,290);
+    // ── Top Lanes ──
+    if(a.lanes.length&&y<240){
+      pdf.setFontSize(11);pdf.setTextColor(30,58,95);pdf.text('Top Lanes',M,y);y+=5;
+      const lnRows=a.lanes.slice(0,6).map(l=>[l.label.length>55?l.label.slice(0,55)+'...':l.label,nf.format(l.value),`${Math.round(l.value/s.shipments*100)}%`]);
+      pdf.autoTable({startY:y,head:[['Lane','Shipments','Share']],body:lnRows,margin:{left:M,right:M},styles:{fontSize:8.5,cellPadding:3,lineColor:[203,213,225],lineWidth:0.15},headStyles:{fillColor:[30,58,95],textColor:255,fontSize:8.5,fontStyle:'bold'},alternateRowStyles:{fillColor:[248,250,252]},columnStyles:{0:{cellWidth:'auto'},1:{halign:'right'},2:{halign:'right'}}});
+    }
+
+    // ── Footer ──
+    pdf.setFontSize(7);pdf.setTextColor(148,163,184);
+    pdf.text(`Generated ${new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}  —  Sonic Business Solutions`,W/2,290,{align:'center'});
 
     const fileName=`${safeFile(ds.client)}_MIS_Report.pdf`;
     setProgress(80,`Saving ${ds.client}...`);
@@ -685,7 +782,7 @@ function parseCsv(text){const clean=String(text||'').replace(/^\uFEFF/,'');const
 function cleanCell(v){return String(v==null?'':v).replace(/^`/,'').trim()}
 function isDelivered(v){const t=cleanCell(v).toLowerCase();return t==='delivered'||t==='delivered to consignee'}
 function parseNum(v){const n=Number(String(v==null?'':v).replace(/[,`]/g,'').trim());return Number.isFinite(n)?n:0}
-function parseDate(v){const c=cleanCell(v);if(!c)return null;const m=c.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?)?/);if(m)return new Date(Number(m[1]),Number(m[2])-1,Number(m[3]||0),Number(m[4]||0),Number(m[5]||0),Number(m[6]||0),Number((m[7]||'0').slice(0,3)));const p=new Date(c);return Number.isNaN(p.getTime())?null:p}
+function parseDate(v){const c=cleanCell(v);if(!c)return null;const ddm=c.match(/^(\d{2})-(\d{2})-(\d{4})(?:[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?)?/);if(ddm)return new Date(Number(ddm[3]),Number(ddm[2])-1,Number(ddm[1]||0),Number(ddm[4]||0),Number(ddm[5]||0),Number(ddm[6]||0),Number((ddm[7]||'0').slice(0,3)));const m=c.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?)?/);if(m)return new Date(Number(m[1]),Number(m[2])-1,Number(m[3]||0),Number(m[4]||0),Number(m[5]||0),Number(m[6]||0),Number((m[7]||'0').slice(0,3)));const p=new Date(c);return Number.isNaN(p.getTime())?null:p}
 function getAsof(r){const d=[];r.forEach(r=>[r.lastScanDate,r.deliveredDate,r.pickupDate,r.manifestDate].forEach(dt=>dt&&d.push(dt)));return d.length?new Date(Math.max(...d.map(d=>d.getTime()))):new Date()}
 function countBy(r,g){const m=new Map();r.forEach(r=>{const k=g(r)||'Unknown';m.set(k,(m.get(k)||0)+1)});return m}
 function topItems(m,l){return Array.from(m.entries()).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])).slice(0,l).map(([l,v])=>({label:l,value:v}))}
