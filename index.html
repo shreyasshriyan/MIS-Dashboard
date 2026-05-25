@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MIS Dashboard — Sonic Business Solutions</title>
-<link rel="icon" type="image/png" href="logo-light.png">
+<link rel="icon" type="image/png" href="static/logo-light.png">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
@@ -767,8 +767,8 @@ async function tryBackend(format){
   setProgress(20,'Connecting to server...');
   const fd=new FormData();app.uploadedFiles.forEach(f=>fd.append('files',f,f.name));fd.append('format',format);
   try{
-    const resp=await fetch(window.location.origin+'/api/generate',{method:'POST',body:fd});
-    if(!resp.ok){showToast(`Server error: ${resp.status}`);return}
+    const resp=await fetch('/api/generate',{method:'POST',body:fd});
+    if(!resp.ok){const errText=await resp.text().catch(()=>'');showToast(`Server error ${resp.status}${errText?': '+errText:''}`);return}
     const blob=await resp.blob(),name=`MIS_Reports_${safeFile(formatDate(new Date()))}.zip`;
     const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;a.click();URL.revokeObjectURL(url);
     setProgress(100,'Done!');

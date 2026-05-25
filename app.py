@@ -30,7 +30,7 @@ from fpdf import FPDF
 
 HERE = Path(__file__).parent
 
-app = Flask(__name__, static_folder=str(HERE), static_url_path='')
+app = Flask(__name__, static_folder=str(HERE), static_url_path='/static')
 
 # ── Auth config ──────────────────────────────────────────────────────
 AUTH_USER = os.environ.get('RENDER_USERNAME', 'admin')
@@ -92,8 +92,7 @@ def safe_text(t):
 def index():
     return send_file(str(HERE / 'index.html'))
 
-@app.route('/api/generate', methods=['POST'])
-@require_auth
+@app.route('/api/generate', methods=['POST', 'OPTIONS'])
 def api_generate():
     files = request.files.getlist('files')
     fmt = request.form.get('format', 'ppt')
