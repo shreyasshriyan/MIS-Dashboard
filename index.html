@@ -622,17 +622,35 @@ async function createReports(format){
   const btn=format==='ppt'?dom.pptBtn:format==='word'?dom.wordBtn:dom.pdfBtn;
   btn.disabled=true;showProgress(10,'Preparing data...');
 
+  // Fetch logo-light.png as both base64 and arrayBuffer
+  let logoBase64 = null;
+  let logoBuffer = null;
+  try {
+    const response = await fetch('logo-light.png');
+    if (response.ok) {
+      const blob = await response.blob();
+      logoBuffer = await blob.arrayBuffer();
+      logoBase64 = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      });
+    }
+  } catch (e) {
+    console.warn("Failed to fetch logo for reports:", e);
+  }
+
   try{
     if(format==='ppt'){
-      await generatePptx();
+      await generatePptx(logoBase64);
       setProgress(100,'Done!')
     }
     else if(format==='pdf'){
-      await generatePdfReports();
+      await generatePdfReports(logoBase64);
       setProgress(100,'Done!')
     }
     else if(format==='word'){
-      await generateDocxReports();
+      await generateDocxReports(logoBuffer);
       setProgress(100,'Done!')
     }
   }catch(e){console.error(e);showToast('Error: '+(e.message||String(e)))}
@@ -640,7 +658,7 @@ async function createReports(format){
 }
 
 // ── PPT Generation (Client-side with pptxgenjs) ──
-async function generatePptx(){
+async function generatePptx(logoBase64){
   if(typeof window.PptxGenJS!=='function'){showToast('PPT library unavailable (network/CDN issue). Try again later.');throw new Error('PptxGenJS not loaded')}
   setProgress(20,'Creating PPT...');
   const datasets=app.datasets.map(ds=>{const r=buildSummary(ds.records);const a=buildAggregates(ds.records);return{...ds,summary:r,agg:a}});
@@ -670,6 +688,9 @@ async function generatePptx(){
     let sl=pptx.addSlide();
     sl.addShape('rect',{x:0,y:0,w:4.5,h:7.5,fill:{color:NAVY}});
     sl.addText('SONIC BUSINESS SOLUTIONS',{x:0.5,y:0.8,w:3.5,h:0.4,fontSize:9,fontFace:'Arial',color:WHITE,bold:true});
+    if (logoBase64) {
+      sl.addImage({ data: logoBase64, x: 5.2, y: 1.0, w: 2.0, h: 0.5 });
+    }
     sl.addText('Logistics Performance Report',{x:5.2,y:2.2,w:7.5,h:0.8,fontSize:34,fontFace:'Arial',color:DARK,bold:true});
     sl.addShape('rect',{x:5.2,y:3.1,w:3.5,h:0.04,fill:{color:BLUE}});
     sl.addText(ds.client,{x:5.2,y:3.4,w:7.5,h:0.4,fontSize:18,fontFace:'Arial',color:NAVY,bold:true});
@@ -679,6 +700,9 @@ async function generatePptx(){
     // ── Slide 2: Executive Summary ──
     sl=pptx.addSlide();
     sectionHeader(sl,0.5,0.15,10,'Executive Summary & Key KPIs');
+    if (logoBase64) {
+      sl.addImage({ data: logoBase64, x: 11.2, y: 0.15, w: 1.6, h: 0.4 });
+    }
     sl.addShape('line',{x:0.5,y:0.58,w:'90%',h:0,line:{color:BORDER,width:0.5}});
     
     // 4 KPI cards row at y = 1.1
@@ -707,6 +731,9 @@ async function generatePptx(){
     // ── Slide 3: Status & Geography ──
     sl=pptx.addSlide();
     sectionHeader(sl,0.5,0.15,10,'Status & Geographic Distribution');
+    if (logoBase64) {
+      sl.addImage({ data: logoBase64, x: 11.2, y: 0.15, w: 1.6, h: 0.4 });
+    }
     sl.addShape('line',{x:0.5,y:0.58,w:'90%',h:0,line:{color:BORDER,width:0.5}});
     
     // Left Status Breakdown
@@ -733,6 +760,9 @@ async function generatePptx(){
     // ── Slide 4: Operational Performance ──
     sl=pptx.addSlide();
     sectionHeader(sl,0.5,0.15,10,'Operational Performance & Efficiency');
+    if (logoBase64) {
+      sl.addImage({ data: logoBase64, x: 11.2, y: 0.15, w: 1.6, h: 0.4 });
+    }
     sl.addShape('line',{x:0.5,y:0.58,w:'90%',h:0,line:{color:BORDER,width:0.5}});
     
     const has_amount = s.amount > 0;
@@ -804,6 +834,9 @@ async function generatePptx(){
     // ── Slide 5: Route Analysis ──
     sl=pptx.addSlide();
     sectionHeader(sl,0.5,0.15,10,'Route & Lane Analysis');
+    if (logoBase64) {
+      sl.addImage({ data: logoBase64, x: 11.2, y: 0.15, w: 1.6, h: 0.4 });
+    }
     sl.addShape('line',{x:0.5,y:0.58,w:'90%',h:0,line:{color:BORDER,width:0.5}});
     
     // Left Top Lanes Table
@@ -848,6 +881,9 @@ async function generatePptx(){
     // ── Slide 6: Exceptions & Priority Items ──
     sl=pptx.addSlide();
     sectionHeader(sl,0.5,0.15,10,'Exceptions & Priority Items');
+    if (logoBase64) {
+      sl.addImage({ data: logoBase64, x: 11.2, y: 0.15, w: 1.6, h: 0.4 });
+    }
     sl.addShape('line',{x:0.5,y:0.58,w:'90%',h:0,line:{color:BORDER,width:0.5}});
     
     // Top callout recommended actions
@@ -885,7 +921,7 @@ async function generatePptx(){
 }
 
 // ── PDF Generation (client-side with jsPDF) ──
-async function generatePdfReports(){
+async function generatePdfReports(logoBase64){
   if(typeof window.jspdf==='undefined'){showToast('PDF library unavailable. Check your internet connection for CDN.');throw new Error('jsPDF not loaded')}
   setProgress(15,'Creating PDF...');
   const datasets=app.datasets.map(ds=>{const r=buildSummary(ds.records);const a=buildAggregates(ds.records);return{...ds,summary:r,agg:a}});
@@ -905,6 +941,9 @@ async function generatePdfReports(){
 
     // ── Title ──
     pdf.setFontSize(22);pdf.setTextColor(30,58,95);pdf.text('MIS Dashboard',M,20);
+    if (logoBase64) {
+      pdf.addImage(logoBase64, 'PNG', W - M - 30, 12, 30, 7.5);
+    }
     pdf.setFontSize(13);pdf.setTextColor(37,99,235);pdf.text(ds.client,M,27);
     pdf.setFontSize(8);pdf.setTextColor(100,116,139);pdf.text(s.period||'Selected Period',M,32);
     pdf.setDrawColor(37,99,235);pdf.setLineWidth(0.6);pdf.line(M,34,M+pw,34);
@@ -970,19 +1009,37 @@ async function generatePdfReports(){
 }
 
 // ── Word Generation (Client-side with docx.js) ──
-async function generateDocxReports(){
+async function generateDocxReports(logoBuffer){
   if(typeof window.docx==='undefined'){showToast('Word library unavailable. Check your internet connection.');throw new Error('docx.js not loaded')}
   setProgress(15,'Creating Word Doc...');
   const datasets=app.datasets.map(ds=>{const r=buildSummary(ds.records);const a=buildAggregates(ds.records);return{...ds,summary:r,agg:a}});
   if(app.datasets.length>=2){const m=getMergedRecords();datasets.push({source:'merged',client:'All Customers (Consolidated)',records:m,summary:buildSummary(m),agg:buildAggregates(m)})}
 
-  const { Document, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, HeadingLevel, BorderStyle, Packer } = window.docx;
+  const { Document, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, HeadingLevel, BorderStyle, ImageRun, Packer } = window.docx;
 
   for(let i=0;i<datasets.length;i++){
     setProgress(15+i*(60/datasets.length),`Generating Word Doc for ${datasets[i].client}...`);
     const ds=datasets[i],s=ds.summary,a=ds.agg;
 
     const children = [];
+
+    // Sonic Logo at top left
+    if (logoBuffer) {
+      children.push(new Paragraph({
+        alignment: AlignmentType.LEFT,
+        children: [
+          new ImageRun({
+            data: logoBuffer,
+            transformation: {
+              width: 120, // 120px wide
+              height: 30  // 30px high
+            },
+            type: "png"
+          })
+        ],
+        spacing: { after: 120 }
+      }));
+    }
 
     // Header Banner Table (Stunning Dark Navy Banner with White Text & Accent Border)
     const bannerTable = new Table({
