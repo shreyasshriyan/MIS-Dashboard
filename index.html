@@ -260,7 +260,7 @@ tr:hover td{background:#F8FAFC}
   </main>
 
   <section id="emptyState" class="empty-state">
-    <div><strong>No logistics CSVs loaded yet.</strong><p>Drop CSV files above or click to browse.</p></div>
+    <div><strong>No CSVs loaded yet.</strong><p>Drop CSV files above or click to browse.</p></div>
   </section>
 
   <footer class="footer">
@@ -690,7 +690,7 @@ async function generatePptx(logoBase64){
     if (logoBase64) {
       sl.addImage({ data: logoBase64, x: 5.2, y: 0.9, w: 1.64, h: 0.9 });
     }
-    sl.addText('Logistics Performance Report',{x:5.2,y:2.2,w:7.5,h:0.8,fontSize:34,fontFace:'Arial',color:DARK,bold:true});
+    sl.addText('Performance Report',{x:5.2,y:2.2,w:7.5,h:0.8,fontSize:34,fontFace:'Arial',color:DARK,bold:true});
     sl.addShape('rect',{x:5.2,y:3.1,w:3.5,h:0.04,fill:{color:BLUE}});
     sl.addText(ds.client,{x:5.2,y:3.4,w:7.5,h:0.4,fontSize:18,fontFace:'Arial',color:NAVY,bold:true});
     sl.addText(`Reporting Period: ${s.period||'Selected Period'}`,{x:5.2,y:3.9,w:7.5,h:0.3,fontSize:11,fontFace:'Arial',color:GRAY});
@@ -864,14 +864,14 @@ async function generatePptx(logoBase64){
     }
     healthItems.push(`Consignments Past Promise: ${nf.format(s.delayedOpen)} shipments require immediate update.`);
     if(has_weight) {
-      healthItems.push(`Total Logistics Weight Handled: ${s.weightLabel} across all consignments.`);
+      healthItems.push(`Total Weight Handled: ${s.weightLabel} across all consignments.`);
     } else if(has_boxes) {
       healthItems.push(`Total Packages Handled: ${nf.format(s.boxes)} boxes.`);
     }
     
     sl.addShape('roundRect',{x:7.35,y:1.5,w:5.4,h:5.0,fill:{color:BG},line:{color:BORDER,width:0.5},rectRadius:0.05});
     sl.addShape('roundRect',{x:7.35,y:1.5,w:0.06,h:5.0,fill:{color:'059669'},rectRadius:0.05});
-    sl.addText('Logistics Performance Indicators',{x:7.55,y:1.62,w:5.0,h:0.25,fontSize:10,fontFace:'Arial',color:DARK,bold:true});
+    sl.addText('Performance Indicators',{x:7.55,y:1.62,w:5.0,h:0.25,fontSize:10,fontFace:'Arial',color:DARK,bold:true});
     healthItems.forEach((item,j)=>{
       sl.addText(`• ${item}`,{x:7.59,y:2.05+j*0.48,w:5.0,h:0.38,fontSize:8.5,fontFace:'Arial',color:'334155'});
     });
