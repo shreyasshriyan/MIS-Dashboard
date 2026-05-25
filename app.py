@@ -94,10 +94,19 @@ def index():
 
 @app.route('/api/generate', methods=['POST', 'OPTIONS'])
 def api_generate():
+    if request.method == 'OPTIONS':
+        resp = Flask.response_class()
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        resp.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        resp.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        return resp
+
     files = request.files.getlist('files')
     fmt = request.form.get('format', 'ppt')
     if not files:
-        return jsonify({'error': 'No CSV files uploaded'}), 400
+        resp = jsonify({'error': 'No CSV files uploaded'})
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        return resp, 400
 
     csv_texts = {}
     for f in files:
@@ -118,7 +127,9 @@ def api_generate():
             datasets.append({'records': records, 'client': client})
 
     if not datasets:
-        return jsonify({'error': 'No valid records'}), 400
+        resp = jsonify({'error': 'No valid records'})
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        return resp, 400
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
@@ -145,8 +156,10 @@ def api_generate():
                 zf.writestr('All_Customers_Consolidated_Logistics_Report.pdf', generate_pdf(merged))
 
     buf.seek(0)
-    return send_file(buf, mimetype='application/zip', as_attachment=True,
+    resp = send_file(buf, mimetype='application/zip', as_attachment=True,
                      download_name=f'Logistics_Reports_{date.today().isoformat()}.zip')
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    return resp
 
 # ── CSV Parsing ──────────────────────────────────────────────────────
 
@@ -554,125 +567,117 @@ def generate_ppt(report):
         rect(sl, x, y, Inches(0.06), h, accent, accent)
         txt(sl, x+Inches(0.2), y+Inches(0.12), w-Inches(0.36), Inches(0.2), title, 9, True, DARK)
         bullets(sl, x+Inches(0.24), y+Inches(0.4), w-Inches(0.48), h-Inches(0.5),
-                [f'- {b}' for b in items[:5]], 8.2, RGBColor(0x33,0x41,0x55))
+                [f'- {b}' for b in items[:6]], 8.2, RGBColor(0x33,0x41,0x55))
 
     # ── Slide 1: Cover ──
     sl = prs.slides.add_slide(prs.slide_layouts[6])
-    rect(sl, 0, 0, sw, Inches(0.55), NAVY)
-    txt(sl, Inches(0.5), Inches(0.08), Inches(12.3), Inches(0.4), 'SONIC BUSINESS SOLUTIONS', 10, True, WHITE)
-    rect(sl, M, Inches(1.0), Inches(12.1), Inches(0.03), BLUE)
-    txt(sl, M, Inches(1.28), Inches(8.5), Inches(0.55), 'MIS Dashboard', 28, True, DARK)
-    txt(sl, M+Inches(0.02), Inches(1.9), Inches(7.5), Inches(0.32), report['client'], 16, True, NAVY)
-    txt(sl, M+Inches(0.02), Inches(2.28), Inches(7.5), Inches(0.25), report['period'], 11, False, GRAY)
-    rect(sl, M, Inches(2.75), Inches(12.1), Inches(0.02), RGBColor(0xCB,0xD5,0xE1))
+    rect(sl, 0, 0, Inches(4.5), sh, NAVY)
+    txt(sl, Inches(0.5), Inches(0.8), Inches(3.5), Inches(0.4), 'SONIC BUSINESS SOLUTIONS', 9, True, WHITE)
+    txt(sl, Inches(5.2), Inches(2.2), Inches(7.5), Inches(0.8), 'Logistics Performance Report', 34, True, DARK)
+    rect(sl, Inches(5.2), Inches(3.1), Inches(3.5), Inches(0.04), BLUE)
+    txt(sl, Inches(5.2), Inches(3.4), Inches(7.5), Inches(0.4), report['client'], 18, True, NAVY)
+    txt(sl, Inches(5.2), Inches(3.9), Inches(7.5), Inches(0.3), f"Reporting Period: {report['period']}", 11, False, GRAY)
+    txt(sl, Inches(5.2), Inches(4.3), Inches(7.5), Inches(0.3), report['generated'], 9.5, False, LGRAY)
+
+    # ── Slide 2: Executive Summary ──
+    sl = prs.slides.add_slide(prs.slide_layouts[6])
+    header(sl, 'Executive Summary & Key KPIs', report['period'], 'High-level consignment performance metrics')
     kpi(sl, [('Total Shipments', fmt_num(report['shipments']), 'All consignments'),
              ('Delivered', f"{report['delivered_rate']}%", f"{fmt_num(report['delivered'])} closed"),
              ('On-Time Rate', f"{report['on_time_rate']}%", f"{fmt_num(report['late_delivered'])} late"),
-             ('Open Delayed', fmt_num(report['open_delayed']), f"{fmt_num(report['open'])} open")], Inches(3.15))
-    callout(sl, Inches(0.72), Inches(4.65), Inches(11.9), Inches(1.55), 'Executive Summary', report['insights'][:3])
-    txt(sl, M, Inches(6.94), Inches(10.8), Inches(0.18), report['generated'], 7.5, False, LGRAY)
-    footer(sl, 'Confidential', report['client'])
+             ('Open Delayed', fmt_num(report['open_delayed']), f"{fmt_num(report['open'])} remain open")], Inches(1.1))
+    callout(sl, Inches(0.55), Inches(2.35), Inches(12.23), Inches(4.2), 'Key Operational Insights', report['insights'], BLUE)
+    footer(sl, report['generated'], report['client'])
 
-    # ── Slide 2: Exec ──
+    # ── Slide 3: Status & Geography ──
     sl = prs.slides.add_slide(prs.slide_layouts[6])
-    header(sl, 'Executive Summary', report['period'], 'Key metrics, trends, and aging')
-    kpi(sl, [('Package Value', report['value_label'], 'Declared invoice value'),
-             ('Total Boxes', fmt_num(report['total_boxes']), report['weight_label']),
-             ('Avg TAT', report['avg_tat_label'], 'Pickup to delivery'),
-             ('Attempted', fmt_num(report['attempted']), 'With attempt')], Inches(0.95))
-    lx, rx, tw = M+Inches(0.05), Inches(6.75), Inches(5.75)
-    callout(sl, lx, Inches(2.22), tw, Inches(2.15), 'Key Insights', report['insights'])
+    header(sl, 'Status & Geographic Distribution', report['period'], 'Consignment status breakdown and destination states')
+    txt(sl, Inches(0.55), Inches(1.1), Inches(5.8), Inches(0.3), 'Current Shipment Status Distribution', 11, True, NAVY)
     sr = [['Status', 'Count', 'Share', 'Comment']]
     ts = max(1, report['shipments'])
     for s, c in report['status_entries']:
-        sh = round(c / ts * 100); cm = 'Closed' if s.lower() == 'delivered' else ('Moving' if 'transit' in s.lower() else 'Monitor')
+        sh = round(c / ts * 100)
+        cm = 'Closed' if s.lower() == 'delivered' else ('Moving' if 'transit' in s.lower() else 'Monitor')
         sr.append([s, fmt_num(c), f'{sh}%', cm])
-    tbl(sl, sr, rx, Inches(2.22), tw, Inches(2.15), [2.4, 1.05, 1.05, 1.25])
-    # Real trend chart
-    trend_data = {}
-    for r in report['records']:
-        d = r['manifest'] or r['pickup']
-        if d:
-            k = d.strftime('%d %b')
-            trend_data[k] = trend_data.get(k, 0) + 1
-    if trend_data:
-        sd = sorted(trend_data.keys())
-        add_line_chart(sl, sd[-10:], [trend_data[k] for k in sd[-10:]],
-                       lx, Inches(4.7), tw, Inches(1.9), 'Daily Manifest Trend')
-    else:
-        add_col_chart(sl, ['No data'], [0], lx, Inches(4.7), tw, Inches(1.9), 'Daily Trend')
-    ar = [['Open Aging', 'Count', 'Interpretation']]
-    for lb, vl in sorted(report['aging'].items()):
-        ar.append([lb, fmt_num(vl), 'Escalate' if lb == '9d+' else ('Watchlist' if lb == '6-8d' else 'Follow-up')])
-    tbl(sl, ar, rx, Inches(4.82), tw, Inches(1.75), [2.2, 1.2, 2.35])
-    footer(sl, report['generated'], report['client'])
-
-    # ── Slide 3: Performance ──
-    sl = prs.slides.add_slide(prs.slide_layouts[6])
-    header(sl, 'Service Performance', 'Delivery closure, promise adherence', 'Operational metrics')
-    status_cats = [s for s, c in report['status_entries']]
-    status_vals = [c for s, c in report['status_entries']]
-    if len(status_cats) >= 2:
-        add_pie_chart(sl, status_cats, status_vals, Inches(0.5), Inches(1.02),
-                      Inches(5.95), Inches(4.35), 'Shipment Status Distribution')
-    else:
-        add_col_chart(sl, status_cats or ['No Data'], status_vals or [0],
-                      Inches(0.5), Inches(1.02), Inches(5.95), Inches(4.35), 'Shipment Status')
-    trend_data = {}
-    for r in report['records']:
-        d = r['manifest'] or r['pickup']
-        if d:
-            k = d.strftime('%d %b')
-            trend_data[k] = trend_data.get(k, 0) + 1
-    if trend_data:
-        sd = sorted(trend_data.keys())
-        add_line_chart(sl, sd[-10:], [trend_data[k] for k in sd[-10:]],
-                       Inches(6.8), Inches(1.02), Inches(5.95), Inches(2.35), 'Daily Manifest Volume')
-    else:
-        add_bar_chart(sl, ['No data'], [0], Inches(6.8), Inches(1.02),
-                      Inches(5.95), Inches(2.35), 'Daily Volume')
-    callout(sl, Inches(6.8), Inches(3.78), Inches(5.95), Inches(1.6), 'Performance Notes', [
-        f"{report['delivered_rate']}% closed delivered.", f"{report['on_time_rate']}% met promise.",
-        f"{fmt_num(report['open_delayed'])} past promise."], RGBColor(0xD9,0x77,0x06))
-    footer(sl, report['generated'], report['client'])
-
-    # ── Slide 4: Network ──
-    sl = prs.slides.add_slide(prs.slide_layouts[6])
-    header(sl, 'Network & Movement', 'Geographic distribution, aging, top lanes', 'States, aging, and lanes')
+    tbl(sl, sr, Inches(0.55), Inches(1.5), Inches(5.8), Inches(5.0), [2.2, 1.1, 1.1, 1.4])
+    txt(sl, Inches(6.98), Inches(1.1), Inches(5.8), Inches(0.3), 'Top Destination States', 11, True, NAVY)
     state_cats = [s for s, c in report['state_entries'][:8]]
     state_vals = [c for s, c in report['state_entries'][:8]]
     if state_cats:
-        add_bar_chart(sl, state_cats, state_vals, Inches(0.5), Inches(1.02),
-                      Inches(5.95), Inches(3.25), 'Top Destination States')
-    aging_cats = sorted(report['aging'].keys())
-    aging_vals = [report['aging'][k] for k in aging_cats]
-    add_col_chart(sl, aging_cats, aging_vals, Inches(6.8), Inches(1.02),
-                  Inches(5.95), Inches(3.25), 'Open Shipment Aging')
-    lr = [['Lane', 'Shipments', 'Delivered', 'Open', 'Rate']]
-    for lane, count in report['lane_entries'][:6]:
+        add_bar_chart(sl, state_cats, state_vals, Inches(6.98), Inches(1.5), Inches(5.8), Inches(5.0), 'Top States')
+    else:
+        txt(sl, Inches(6.98), Inches(1.5), Inches(5.8), Inches(1.0), 'No geographic destination data available.', 9, False, GRAY)
+    footer(sl, report['generated'], report['client'])
+
+    # ── Slide 4: Operational Performance ──
+    sl = prs.slides.add_slide(prs.slide_layouts[6])
+    header(sl, 'Operational Performance & Efficiency', report['period'], 'Turnaround time, invoice values, and shipment aging')
+    kpi(sl, [('Package Value', report['value_label'], 'Declared invoice value'),
+             ('Total Boxes', fmt_num(report['total_boxes']), report['weight_label']),
+             ('Avg TAT', report['avg_tat_label'], 'Pickup to delivery'),
+             ('Attempted', fmt_num(report['attempted']), 'With attempt')], Inches(1.1))
+    txt(sl, Inches(0.55), Inches(2.35), Inches(5.8), Inches(0.3), 'Open Shipment Aging Bucket Analysis', 11, True, NAVY)
+    ar = [['Aging Bucket', 'Count', 'Required Operational Action']]
+    for lb, vl in sorted(report['aging'].items()):
+        ar.append([lb, fmt_num(vl), 'Escalate immediately' if lb == '9d+' else ('Monitor closely' if lb == '6-8d' else 'Routine follow-up')])
+    tbl(sl, ar, Inches(0.55), Inches(2.75), Inches(5.8), Inches(3.75), [1.6, 1.2, 3.0])
+    txt(sl, Inches(6.98), Inches(2.35), Inches(5.8), Inches(0.3), 'Daily Manifest Volume Trend', 11, True, NAVY)
+    trend_data = {}
+    for r in report['records']:
+        d = r['manifest'] or r['pickup']
+        if d:
+            k = d.strftime('%d %b')
+            trend_data[k] = trend_data.get(k, 0) + 1
+    if trend_data:
+        sd = sorted(trend_data.keys())
+        add_line_chart(sl, sd[-10:], [trend_data[k] for k in sd[-10:]],
+                       Inches(6.98), Inches(2.75), Inches(5.8), Inches(3.75), 'Manifest Volume')
+    else:
+        add_col_chart(sl, ['No Data'], [0], Inches(6.98), Inches(2.75), Inches(5.8), Inches(3.75), 'Trend')
+    footer(sl, report['generated'], report['client'])
+
+    # ── Slide 5: Route Analysis ──
+    sl = prs.slides.add_slide(prs.slide_layouts[6])
+    header(sl, 'Route & Lane Analysis', report['period'], 'Volume distribution and delivery rates by key lanes')
+    txt(sl, Inches(0.55), Inches(1.1), Inches(6.2), Inches(0.3), 'Top Shipping Lanes (by Shipment Count)', 11, True, NAVY)
+    lr = [['Lane (Origin -> Destination)', 'Shipments', 'Delivered', 'Open', 'Rate']]
+    for lane, count in report['lane_entries'][:8]:
         lr_recs = [r for r in report['records'] if f"{r['origin']} -> {r['dest']}" == lane]
         ld = sum(1 for r in lr_recs if r['is_delivered'])
         rt = round(ld / count * 100) if count else 0
         lr.append([lane[:46], fmt_num(count), fmt_num(ld), fmt_num(count-ld), f'{rt}%'])
-    tbl(sl, lr, Inches(0.55), Inches(4.82), Inches(12.1), Inches(1.65), [5.3, 1.65, 1.65, 1.65, 1.85])
+    tbl(sl, lr, Inches(0.55), Inches(1.5), Inches(6.2), Inches(5.0), [2.8, 0.85, 0.85, 0.85, 0.85])
+    txt(sl, Inches(7.35), Inches(1.1), Inches(5.4), Inches(0.3), 'Operational Delivery Health Summary', 11, True, NAVY)
+    health_items = [
+        f"Overall Delivery Performance: {report['delivered_rate']}% closure rate.",
+        f"SLA Adherence (On-Time Rate): {report['on_time_rate']}% of shipments met promise date.",
+        f"Average Turnaround Time: {report['avg_tat_label']} from manifest to delivery.",
+        f"Total Financial Value: {report['value_label']} declared package invoice value.",
+        f"Consignments Past Promise: {fmt_num(report['open_delayed'])} shipments require immediate update.",
+        f"Total Logistics Weight Handled: {report['weight_label']} across all consignments."
+    ]
+    callout(sl, Inches(7.35), Inches(1.5), Inches(5.4), Inches(5.0), 'Logistics Performance Indicators', health_items, RGBColor(0x05, 0x96, 0x69))
     footer(sl, report['generated'], report['client'])
 
-    # ── Slide 5: Exceptions ──
+    # ── Slide 6: Exceptions & Priority Items ──
     sl = prs.slides.add_slide(prs.slide_layouts[6])
-    header(sl, 'Exceptions & Priority Items', 'Delayed and open shipments', 'Actionable items')
-    callout(sl, Inches(0.55), Inches(0.98), Inches(12.1), Inches(0.88), 'Recommended Actions', [
-        'Prioritize open delayed — confirm ETAs immediately.',
-        'Review late-delivered lanes for recurring issues.'], RGBColor(0xDC,0x26,0x26))
-    er = [['Order', 'Destination', 'Status', 'Promise', 'Last Scan', 'Amount', 'Action']]
+    header(sl, 'Exceptions & Priority Items', report['period'], 'Delayed and open shipments requiring escalation')
+    callout(sl, Inches(0.55), Inches(1.0), Inches(12.23), Inches(1.3), 'Recommended Operational Escalation Path', [
+        'Identify priority exceptions list below.',
+        'For delayed shipments (past promise date), immediately contact consignee hub/transporter for ETA update.',
+        'Confirm next-step scan details and log dispatcher comments.',
+        'Monitor high-value shipments to prevent losses.'], RGBColor(0xDC,0x26,0x26))
+    txt(sl, Inches(0.55), Inches(2.45), Inches(12.2), Inches(0.35), 'Priority Consignment Watchlist (Open / Delayed)', 11, True, NAVY)
+    er = [['Order ID', 'Consignment Destination', 'Status', 'Promise Date', 'Last Scan Date', 'Invoice Value', 'Action Recommended']]
     now = datetime.now()
-    for r in report['priority_records'][:8]:
+    for r in report['priority_records'][:10]:
         delayed = not r['is_delivered'] and r['promise'] and r['promise'] < now
         if not r['is_delivered'] or delayed:
             slbl = 'Delayed' if delayed else ('Delivered' if r['is_delivered'] else 'Open')
-            act = 'Expedite / confirm ETA' if delayed else ('Review late reason' if r['is_delivered'] else 'Track')
+            act = 'Expedite / escalate' if delayed else ('Verify reason' if r['is_delivered'] else 'Track shipment')
             er.append([r['id'][:22], f"{r['dest']}, {r['state']}"[:28], slbl,
                        fmt_date(r['promise']), fmt_date(r['last_scan']), fmt_money(r['amount']), act])
-    tbl(sl, er, Inches(0.55), Inches(2.18), Inches(12.1), Inches(4.2), [2.05, 2.4, 1.35, 1.35, 1.65, 1.45, 1.85])
+    tbl(sl, er, Inches(0.55), Inches(2.85), Inches(12.2), Inches(3.65), [1.8, 2.2, 1.1, 1.2, 1.2, 1.2, 1.8])
     footer(sl, report['generated'], report['client'])
 
     buf = io.BytesIO(); prs.save(buf); return buf.getvalue()
