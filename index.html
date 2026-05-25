@@ -370,8 +370,9 @@ function normalizeRow(row,index,fields,schema){
   const st=g('status'),stt=g('statusType'),dd=parseDate(g('delivered'));
   let o=g('origin'),d=g('destination'),s=g('state'),z=g('zone');
   if(schema==='customer_mis'||schema==='mis_may'||schema==='generic'){s=guessState(d);z=''}
+  const boxesVal=parseNum(g('boxes'));
   return{row,index,id:g('id')||g('lrn')||`Row ${index+1}`,lrn:g('lrn'),client:titleCase(g('client'))||'Customer',
-    boxes:parseNum(g('boxes')),warehouse:titleCase(g('warehouse'))||'Unassigned',
+    boxes:fields.boxes?boxesVal:(boxesVal||1),warehouse:titleCase(g('warehouse'))||'Unassigned',
     manifestDate:parseDate(g('manifest')),pickupDate:parseDate(g('pickup')),expectedDate:parseDate(g('expected')),
     promiseDate:parseDate(g('promise'))||parseDate(g('expected')),deliveredDate:dd,
     lastScanDate:parseDate(g('lastScan')),lastScanLocation:g('lastScanLocation'),
@@ -387,12 +388,13 @@ function buildSummary(records){
   const dwp=records.filter(r=>r.isDelivered&&r.deliveredDate&&r.promiseDate),onTime=dwp.filter(r=>!getFlags(r).lateDelivered).length;
   const tat=records.filter(r=>r.isDelivered&&r.deliveredDate&&(r.pickupDate||r.manifestDate));
   const avgTat=tat.length?sum(tat,r=>diffDays(r.pickupDate||r.manifestDate,r.deliveredDate))/tat.length:0;
+  const hasDeliveryDates=records.some(r=>r.deliveredDate);
   const amount=sum(records,r=>r.amount),weight=sum(records,r=>r.weight);
   return{shipments,delivered,open,delayedOpen,lateDelivered,attempted:records.filter(r=>r.attempts>0).length,
     boxes:Math.round(sum(records,r=>r.boxes)),amount,weight,
     deliveredRate:shipments?Math.round(delivered/shipments*100):0,
     onTimeRate:dwp.length?Math.round(onTime/dwp.length*100):0,avgTat,
-    avgTatLabel:`${df.format(avgTat)}d`,valueLabel:fmtMoney(amount),weightLabel:`${df.format(weight)} kg`}
+    avgTatLabel:hasDeliveryDates?(tat.length?`${df.format(avgTat)}d`:'N/A'):'N/A',valueLabel:fmtMoney(amount),weightLabel:`${df.format(weight)} kg`}
 }
 
 function buildAggregates(records){

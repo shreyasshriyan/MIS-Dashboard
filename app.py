@@ -234,7 +234,7 @@ def build_report(records):
         n['id'] = id_raw or _auto_col(raw, ['order', 'reference', 'lr no', 'lrn', 'tracking', 'awb', 'waybill', 'shipment'])
         client_raw = str(raw.get('client', raw.get('customer code', raw.get('customer', '')))).replace('`', '').strip()
         n['client'] = client_raw or _auto_col(raw, ['client', 'customer', 'network', 'partner', 'vendor'])
-        n['boxes'] = parse_num(raw.get('no of boxes', raw.get('num pieces', _auto_col(raw, ['box', 'piece', 'item', 'quantity', 'pkg']))))
+        n['boxes'] = parse_num(raw.get('no of boxes', raw.get('num pieces', _auto_col(raw, ['box', 'piece', 'item', 'quantity', 'pkg'])))) or 1
         n['origin'] = str(raw.get('origin city', raw.get('sender city', _auto_col(raw, ['origin', 'sender', 'from city', 'source'])))).strip().title()
         n['dest'] = str(raw.get('destination city', raw.get('consignee city', _auto_col(raw, ['destination', 'consignee', 'to city'])))).strip().title()
         wh = str(raw.get('client location/warehouse', raw.get('origin hub name', _auto_col(raw, ['warehouse', 'hub', 'location'])))).strip()
@@ -271,6 +271,7 @@ def build_report(records):
     on_time = sum(1 for r in dwp if r['delivered'] <= r['promise'])
     on_rate = round(on_time / len(dwp) * 100) if dwp else 0
     tat_r = [r for r in normalized if r['is_delivered'] and r['delivered'] and (r['pickup'] or r['manifest'])]
+    has_del_dates = any(r['delivered'] for r in normalized)
     avg_tat = sum((r['delivered'] - (r['pickup'] or r['manifest'])).days for r in tat_r) / len(tat_r) if tat_r else 0
     del_rate = round(delivered / shipments * 100) if shipments else 0
 
@@ -316,7 +317,7 @@ def build_report(records):
         'shipments': shipments, 'delivered': delivered, 'open': open_s,
         'late_delivered': late, 'open_delayed': open_delay,
         'delivered_rate': del_rate, 'on_time_rate': on_rate,
-        'avg_tat': avg_tat, 'avg_tat_label': f'{avg_tat:.1f}d',
+        'avg_tat': avg_tat, 'avg_tat_label': f'{avg_tat:.1f}d' if (has_del_dates and tat_r) else 'N/A',
         'total_boxes': round(sum(r['boxes'] for r in normalized)),
         'total_weight': sum(r['weight'] for r in normalized),
         'total_amount': sum(r['amount'] for r in normalized),
