@@ -688,7 +688,7 @@ async function generatePptx(logoBase64){
     sl.addShape('rect',{x:0,y:0,w:4.5,h:7.5,fill:{color:NAVY}});
     sl.addText('SONIC BUSINESS SOLUTIONS',{x:0.5,y:0.8,w:3.5,h:0.4,fontSize:9,fontFace:'Arial',color:WHITE,bold:true});
     if (logoBase64) {
-      sl.addImage({ data: logoBase64, x: 5.2, y: 1.0, w: 2.0, h: 0.5 });
+      sl.addImage({ data: logoBase64, x: 5.2, y: 0.9, w: 1.64, h: 0.9 });
     }
     sl.addText('Logistics Performance Report',{x:5.2,y:2.2,w:7.5,h:0.8,fontSize:34,fontFace:'Arial',color:DARK,bold:true});
     sl.addShape('rect',{x:5.2,y:3.1,w:3.5,h:0.04,fill:{color:BLUE}});
@@ -700,7 +700,7 @@ async function generatePptx(logoBase64){
     sl=pptx.addSlide();
     sectionHeader(sl,0.5,0.15,10,'Executive Summary & Key KPIs');
     if (logoBase64) {
-      sl.addImage({ data: logoBase64, x: 11.2, y: 0.15, w: 1.6, h: 0.4 });
+      sl.addImage({ data: logoBase64, x: 11.68, y: 0.12, w: 0.82, h: 0.45 });
     }
     sl.addShape('line',{x:0.5,y:0.58,w:'90%',h:0,line:{color:BORDER,width:0.5}});
     
@@ -731,7 +731,7 @@ async function generatePptx(logoBase64){
     sl=pptx.addSlide();
     sectionHeader(sl,0.5,0.15,10,'Status & Geographic Distribution');
     if (logoBase64) {
-      sl.addImage({ data: logoBase64, x: 11.2, y: 0.15, w: 1.6, h: 0.4 });
+      sl.addImage({ data: logoBase64, x: 11.68, y: 0.12, w: 0.82, h: 0.45 });
     }
     sl.addShape('line',{x:0.5,y:0.58,w:'90%',h:0,line:{color:BORDER,width:0.5}});
     
@@ -760,7 +760,7 @@ async function generatePptx(logoBase64){
     sl=pptx.addSlide();
     sectionHeader(sl,0.5,0.15,10,'Operational Performance & Efficiency');
     if (logoBase64) {
-      sl.addImage({ data: logoBase64, x: 11.2, y: 0.15, w: 1.6, h: 0.4 });
+      sl.addImage({ data: logoBase64, x: 11.68, y: 0.12, w: 0.82, h: 0.45 });
     }
     sl.addShape('line',{x:0.5,y:0.58,w:'90%',h:0,line:{color:BORDER,width:0.5}});
     
@@ -834,7 +834,7 @@ async function generatePptx(logoBase64){
     sl=pptx.addSlide();
     sectionHeader(sl,0.5,0.15,10,'Route & Lane Analysis');
     if (logoBase64) {
-      sl.addImage({ data: logoBase64, x: 11.2, y: 0.15, w: 1.6, h: 0.4 });
+      sl.addImage({ data: logoBase64, x: 11.68, y: 0.12, w: 0.82, h: 0.45 });
     }
     sl.addShape('line',{x:0.5,y:0.58,w:'90%',h:0,line:{color:BORDER,width:0.5}});
     
@@ -881,7 +881,7 @@ async function generatePptx(logoBase64){
     sl=pptx.addSlide();
     sectionHeader(sl,0.5,0.15,10,'Exceptions & Priority Items');
     if (logoBase64) {
-      sl.addImage({ data: logoBase64, x: 11.2, y: 0.15, w: 1.6, h: 0.4 });
+      sl.addImage({ data: logoBase64, x: 11.68, y: 0.12, w: 0.82, h: 0.45 });
     }
     sl.addShape('line',{x:0.5,y:0.58,w:'90%',h:0,line:{color:BORDER,width:0.5}});
     
@@ -941,7 +941,7 @@ async function generatePdfReports(logoBase64){
     // ── Title ──
     pdf.setFontSize(22);pdf.setTextColor(30,58,95);pdf.text('MIS Dashboard',M,20);
     if (logoBase64) {
-      pdf.addImage(logoBase64, 'PNG', W - M - 30, 12, 30, 7.5);
+      pdf.addImage(logoBase64, 'PNG', W - M - 18, 11, 18, 9.9);
     }
     pdf.setFontSize(13);pdf.setTextColor(37,99,235);pdf.text(ds.client,M,27);
     pdf.setFontSize(8);pdf.setTextColor(100,116,139);pdf.text(s.period||'Selected Period',M,32);
@@ -1030,8 +1030,8 @@ async function generateDocxReports(logoBuffer){
           new ImageRun({
             data: logoBuffer,
             transformation: {
-              width: 120, // 120px wide
-              height: 30  // 30px high
+              width: 73,  // 73px wide
+              height: 40  // 40px high
             },
             type: "png"
           })
