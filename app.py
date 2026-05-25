@@ -30,7 +30,7 @@ from fpdf import FPDF
 
 HERE = Path(__file__).parent
 
-app = Flask(__name__, static_folder=str(HERE), static_url_path='/static')
+app = Flask(__name__, static_folder=str(HERE), static_url_path='')
 
 # ── Auth config ──────────────────────────────────────────────────────
 AUTH_USER = os.environ.get('RENDER_USERNAME', 'admin')
