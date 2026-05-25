@@ -247,6 +247,10 @@ tr:hover td{background:#F8FAFC}
           <button class="btn-red" id="pdfBtn" disabled><i data-lucide="file"></i> PDF</button>
         </div>
       </div>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <label for="apiUrlInput" style="font-size:11px;font-weight:700;color:var(--slate);text-transform:uppercase;letter-spacing:.5px">Backend API URL:</label>
+        <input type="text" id="apiUrlInput" placeholder="e.g. https://mis-dashboard.onrender.com (Optional)" style="min-height:32px;padding:0 10px;font-size:12px;border:1px solid var(--border);border-radius:var(--radius-sm);width:320px;background:var(--card);color:var(--ink)">
+      </div>
     </div>
   </main>
 
@@ -296,7 +300,16 @@ const sdf=new Intl.DateTimeFormat('en-IN',{day:'2-digit',month:'short'});
 const DAY=864e5;
 let charts={};
 
-function init(){bindEvents();setBaseFilterOptions();createIcons()}
+function init(){
+  bindEvents();
+  setBaseFilterOptions();
+  createIcons();
+  // Load custom API URL from localStorage
+  const savedUrl = localStorage.getItem('sonic_backend_api_url') || '';
+  if ($('apiUrlInput')) {
+    $('apiUrlInput').value = savedUrl;
+  }
+}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 
 function bindEvents(){
@@ -309,7 +322,12 @@ function bindEvents(){
   dom.wordBtn.addEventListener('click',()=>createReports('word'));
   dom.pdfBtn.addEventListener('click',()=>createReports('pdf'));
   [dom.periodFilter,dom.warehouseFilter,dom.stateFilter,dom.statusFilter].forEach(s=>s.addEventListener('change',()=>{app.filters.period=dom.periodFilter.value;app.filters.warehouse=dom.warehouseFilter.value;app.filters.state=dom.stateFilter.value;app.filters.status=dom.statusFilter.value;applyFilters()}));
-  window.addEventListener('resize',debounce(()=>{if(app.filtered.length)renderCharts(buildAggregates(app.filtered))},200))
+  window.addEventListener('resize',debounce(()=>{if(app.filtered.length)renderCharts(buildAggregates(app.filtered))},200));
+  if ($('apiUrlInput')) {
+    $('apiUrlInput').addEventListener('input', e => {
+      localStorage.setItem('sonic_backend_api_url', e.target.value.trim());
+    });
+  }
 }
 
 function detectSchema(header){for(const[k,p]of Object.entries(SCHEMAS))if(p.detect&&p.detect(header))return k;return 'generic'}
@@ -853,6 +871,11 @@ async function tryBackend(format){
   
   // Try local Flask server and standard Render production fallbacks if not hosted on same origin
   const apiUrls = ['/api/generate'];
+  const customUrl = $('apiUrlInput') ? $('apiUrlInput').value.trim() : '';
+  if (customUrl) {
+    const base = customUrl.endsWith('/') ? customUrl.slice(0, -1) : customUrl;
+    apiUrls.unshift(`${base}/api/generate`);
+  }
   apiUrls.push('http://127.0.0.1:5000/api/generate');
   apiUrls.push('http://localhost:5000/api/generate');
   apiUrls.push('https://logistics-dashboard.onrender.com/api/generate');
